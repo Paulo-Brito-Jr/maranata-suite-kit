@@ -1,0 +1,72 @@
+#!/bin/sh
+# Pre-push gate — porteiro da frota + verde mínimo (typecheck + lint zero-warning).
+# Replicado do skynet (L99 Onda 4, tsk_k-j0QZfdIY). A main vai direto pra prod
+# (trunk-based, sem PR), então este hook é a última rede antes do ar.
+#
+# 1. PORTEIRO (.githooks/lib/frota-git-porteiro.sh): bloqueia delete em massa,
+#    segredos e lixo (node_modules/.next/.env/log) antes de subir.
+# 2. VERDE MÍNIMO: typecheck (tsc) + lint:strict (eslint --max-warnings 0).
+#    Zero warning é o gate — não regredir.
+#
+# Bypass total: git push --no-verify (NÃO recomendado).
+
+PORTEIRO_PATH="$(dirname "$0")/lib/frota-git-porteiro.sh"
+
+if [ -x "$PORTEIRO_PATH" ]; then
+  # git passa refs via stdin. Salva pra repassar pro porteiro (não consome).
+  REFS_TMP=$(mktemp)
+  cat > "$REFS_TMP"
+  if ! "$PORTEIRO_PATH" < "$REFS_TMP"; then
+    rm -f "$REFS_TMP"
+    exit 1
+  fi
+  rm -f "$REFS_TMP"
+fi
+
+# Diretórios com package.json a validar (espaço-separados; "." = raiz).
+APP_DIRS="."
+
+GIT_ROOT=$(git rev-parse --show-toplevel)
+
+for dir in $APP_DIRS; do
+  (
+    cd "$GIT_ROOT/$dir" 2>/dev/null || { echo "❌ [pre-push] diretório '$dir' não existe"; exit 1; }
+    [ -f package.json ] || exit 0
+
+    label=""
+    [ "$dir" != "." ] && label=" ($dir)"
+
+    # Runner pelo lockfile do diretório (pnpm > npm > yarn; fallback pnpm).
+    if [ -f pnpm-lock.yaml ] && command -v pnpm >/dev/null 2>&1; then
+      RUN="pnpm"
+    elif [ -f package-lock.json ]; then
+      RUN="npm run"
+    elif [ -f yarn.lock ] && command -v yarn >/dev/null 2>&1; then
+      RUN="yarn"
+    elif command -v pnpm >/dev/null 2>&1; then
+      RUN="pnpm"
+    else
+      RUN="npm run"
+    fi
+
+    echo "[pre-push]$label rodando $RUN typecheck…"
+    if ! $RUN typecheck; then
+      echo ""
+      echo "❌ [pre-push]$label tsc encontrou ERROS de tipo — push abortado (build do Vercel quebraria)."
+      echo "   Bypass: git push --no-verify (NÃO recomendado)."
+      exit 1
+    fi
+    echo "✅ [pre-push]$label typecheck ok"
+
+    echo "[pre-push]$label rodando $RUN lint:strict (--max-warnings 0)…"
+    if ! $RUN lint:strict; then
+      echo ""
+      echo "❌ [pre-push]$label ESLint encontrou erros OU warnings — push abortado (gate em --max-warnings 0; não regredir)."
+      echo "   Veja: $RUN lint   ·   Bypass: git push --no-verify (NÃO recomendado)."
+      exit 1
+    fi
+    echo "✅ [pre-push]$label lint 0 warnings — pode pushar"
+  ) || exit 1
+done
+
+exit 0

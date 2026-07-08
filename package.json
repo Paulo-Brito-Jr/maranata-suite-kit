@@ -1,0 +1,57 @@
+{
+  "name": "@paulo-brito-jr/maranata-suite-kit",
+  "version": "0.1.0",
+  "description": "App switcher unificado da Suite Maranata — catálogo canônico, membership client fail-soft e componente de UI portátil (React cru + Tailwind, sem deps de host).",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist/**",
+    "README.md"
+  ],
+  "exports": {
+    "./catalog": {
+      "types": "./dist/catalog.d.ts",
+      "import": "./dist/catalog.js"
+    },
+    "./membership": {
+      "types": "./dist/membership.d.ts",
+      "import": "./dist/membership.js"
+    },
+    "./app-switcher": {
+      "types": "./dist/app-switcher.d.ts",
+      "import": "./dist/app-switcher.js"
+    },
+    "./fallback": {
+      "types": "./dist/fallback.d.ts",
+      "import": "./dist/fallback.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo '⚠️  pendência: eslint não configurado neste pacote ainda — nada pra lintar' && exit 0",
+    "lint:strict": "echo '⚠️  pendência: eslint não configurado neste pacote ainda — nada pra lintar (adicionar quando o pacote crescer)' && exit 0",
+    "smoke": "node scripts/smoke.mjs",
+    "prepare": "git config core.hooksPath .githooks || true",
+    "prepublishOnly": "npm run build"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Paulo-Brito-Jr/maranata-suite-kit.git"
+  },
+  "homepage": "https://github.com/Paulo-Brito-Jr/maranata-suite-kit",
+  "peerDependencies": {
+    "react": ">=18 <20"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true }
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.6.0"
+  }
+}

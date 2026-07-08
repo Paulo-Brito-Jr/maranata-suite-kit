@@ -1,0 +1,113 @@
+/**
+ * Catálogo canônico de apps da Suite Maranata.
+ *
+ * SNAPSHOT — a fonte de verdade é o maranata-key:
+ *   /Users/paulobrito/dev/maranata-key/src/lib/maranata-suite.ts (MARANATA_SUITE_APPS)
+ *
+ * Qualquer app novo da Suite entra PRIMEIRO lá; este pacote é um espelho
+ * read-only, só com os campos que o app-switcher e o fallback precisam
+ * (slug/nome/url/icon/cor). Campos omitidos de propósito porque são
+ * específicos do fluxo de SSO do maranata-key e não servem a este pacote:
+ * `descricao`, `allowedOrigins`, `allowedReturnPaths`.
+ *
+ * Ao adicionar/mudar um app no maranata-key, resincronize esta tabela
+ * manualmente (copiar os 5 campos) e suba um patch novo deste pacote.
+ */
+
+export type SuiteCatalogEntry = {
+  slug: string;
+  nome: string;
+  /** URL canônica *.maranata.app — nunca um preview .vercel.app. */
+  url: string;
+  /** Emoji/char do app (sem lib de ícones — ver ./app-switcher). */
+  icon: string;
+  /** Cor de marca em hex, usada como acento no switcher. */
+  cor: string;
+};
+
+export const MARANATA_SUITE_CATALOG: Record<string, SuiteCatalogEntry> = {
+  acampamento: {
+    slug: "acampamento",
+    nome: "Acampamento Maranata",
+    url: "https://acampamento.maranata.app",
+    icon: "⛺",
+    cor: "#f97316",
+  },
+  rodizio: {
+    slug: "rodizio",
+    nome: "Rodízio Maranata",
+    url: "https://rodizio.maranata.app",
+    icon: "🔁",
+    cor: "#ff6e32",
+  },
+  escala: {
+    slug: "escala",
+    nome: "Maranata Escala",
+    url: "https://escala.maranata.app",
+    icon: "🗓️",
+    cor: "#163970",
+  },
+  pastoral: {
+    slug: "pastoral",
+    nome: "Maranata Pastoral",
+    url: "https://pastoral.maranata.app",
+    icon: "⛪",
+    cor: "#ff6e32",
+  },
+  core: {
+    slug: "core",
+    nome: "Maranata Core",
+    url: "https://core.maranata.app",
+    icon: "🧭",
+    cor: "#163970",
+  },
+  "festa-amor": {
+    slug: "festa-amor",
+    nome: "Festa do Amor",
+    url: "https://festa-amor.maranata.app",
+    icon: "🎉",
+    cor: "#ff6e32",
+  },
+  financeiro: {
+    slug: "financeiro",
+    nome: "Financeiro Maranata",
+    url: "https://financeiro.maranata.app",
+    icon: "💰",
+    cor: "#10b981",
+  },
+  "maranata-app": {
+    slug: "maranata-app",
+    nome: "Maranata App",
+    url: "https://maranata.app",
+    icon: "📱",
+    cor: "#F0641E",
+  },
+  ministerio: {
+    slug: "ministerio",
+    nome: "Ministério Maranata",
+    url: "https://ministerio.maranata.app",
+    icon: "🏛️",
+    cor: "#163970",
+  },
+  // InChurch é o painel de auditoria (não-Maranata, fica em britos.app por
+  // decisão) — mantido aqui pra não regredir o comportamento hardcoded atual.
+  "inchurch-dashboard": {
+    slug: "inchurch-dashboard",
+    nome: "InChurch (auditoria)",
+    url: "https://inchurch.britos.app",
+    icon: "📊",
+    cor: "#163970",
+  },
+};
+
+/**
+ * Resolve a URL canônica de um app pelo slug. SEMPRE prefere o catálogo
+ * local (mata URL velha/preview `.vercel.app` que possa ter ficado presa
+ * em algum registro de banco). Só usa `fallbackUrl` quando o slug é
+ * desconhecido do catálogo (app novo que ainda não foi sincronizado aqui).
+ */
+export function canonicalAppUrl(slug: string, fallbackUrl?: string | null): string | null {
+  const known = MARANATA_SUITE_CATALOG[slug];
+  if (known) return known.url;
+  return fallbackUrl?.trim() || null;
+}
