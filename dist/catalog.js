@@ -35,12 +35,19 @@ export const MARANATA_SUITE_CATALOG = {
         icon: "🗓️",
         cor: "#163970",
     },
+    agenda: {
+        slug: "agenda",
+        nome: "Agenda Maranata",
+        url: "https://agenda.maranata.app",
+        icon: "📅",
+        cor: "#ff6e32",
+    },
     pastoral: {
         slug: "pastoral",
-        nome: "Maranata Pastoral",
+        nome: "Cuidado Pastoral",
         url: "https://pastoral.maranata.app",
-        icon: "⛪",
-        cor: "#ff6e32",
+        icon: "🐑",
+        cor: "#0d9488",
     },
     core: {
         slug: "core",
