@@ -1,6 +1,6 @@
 {
   "name": "@paulo-brito-jr/maranata-suite-kit",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Kit da Suite Maranata — app switcher unificado (catálogo canônico + membership fail-soft + UI portátil) e cliente canônico do Maranata Core (Church/Pastor/User, fonte de verdade).",
   "license": "MIT",
   "type": "module",
@@ -28,6 +28,10 @@
     "./fallback": {
       "types": "./dist/fallback.d.ts",
       "import": "./dist/fallback.js"
+    },
+    "./permissions": {
+      "types": "./dist/permissions.d.ts",
+      "import": "./dist/permissions.js"
     }
   },
   "scripts": {
@@ -52,7 +56,9 @@
     "react": ">=18 <20"
   },
   "peerDependenciesMeta": {
-    "react": { "optional": true }
+    "react": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
