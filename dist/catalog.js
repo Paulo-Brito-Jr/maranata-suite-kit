@@ -93,6 +93,13 @@ export const MARANATA_SUITE_CATALOG = {
         icon: "📊",
         cor: "#163970",
     },
+    "360": {
+        slug: "360",
+        nome: "Maranata 360",
+        url: "https://360.maranata.app",
+        icon: "🕊️",
+        cor: "#ff6e32",
+    },
 };
 /**
  * Resolve a URL canônica de um app pelo slug. SEMPRE prefere o catálogo

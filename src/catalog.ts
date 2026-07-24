@@ -105,6 +105,13 @@ export const MARANATA_SUITE_CATALOG: Record<string, SuiteCatalogEntry> = {
     icon: "📊",
     cor: "#163970",
   },
+  "360": {
+    slug: "360",
+    nome: "Maranata 360",
+    url: "https://360.maranata.app",
+    icon: "🕊️",
+    cor: "#ff6e32",
+  },
 };
 
 /**
