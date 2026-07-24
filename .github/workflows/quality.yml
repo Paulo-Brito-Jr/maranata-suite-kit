@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+# URLs dummy: prisma generate lê o schema sem conectar; satisfaz configs que
+# validam a existência das envs. Nenhum banco real é tocado.
+env:
+  DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci"
+  DIRECT_URL: "postgresql://ci:ci@localhost:5432/ci"
+
 jobs:
   quality:
     name: quality
