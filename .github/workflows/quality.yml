@@ -23,6 +23,8 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Prisma generate (if used)
+        run: if [ -f prisma/schema.prisma ]; then pnpm exec prisma generate; fi
       - name: Typecheck
         run: pnpm run typecheck
       - name: Lint (strict)
