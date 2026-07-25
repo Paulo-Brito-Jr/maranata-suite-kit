@@ -7,6 +7,13 @@ updates:
       day: "monday"
     open-pull-requests-limit: 3
     labels: ["dependencies"]
+    # Prisma 7 e uma migracao estrutural (schema.prisma -> prisma.config.ts),
+    # nao um bump: fica fora do grupo ate o projeto de migracao dedicado.
+    ignore:
+      - dependency-name: "prisma"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@prisma/*"
+        update-types: ["version-update:semver-major"]
     groups:
       todas-as-deps:
         patterns: ["*"]
