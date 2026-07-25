@@ -84,6 +84,13 @@ export const MARANATA_SUITE_CATALOG = {
         icon: "🏛️",
         cor: "#163970",
     },
+    igreja: {
+        slug: "igreja",
+        nome: "Igreja Maranata",
+        url: "https://igreja.maranata.app",
+        icon: "⛪",
+        cor: "#15966A",
+    },
     // InChurch é o painel de auditoria (não-Maranata, fica em britos.app por
     // decisão) — mantido aqui pra não regredir o comportamento hardcoded atual.
     "inchurch-dashboard": {
