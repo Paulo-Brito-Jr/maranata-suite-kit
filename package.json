@@ -1,6 +1,6 @@
 {
   "name": "@paulo-brito-jr/maranata-suite-kit",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Kit da Suite Maranata — app switcher unificado (catálogo canônico + membership fail-soft + UI portátil) e cliente canônico do Maranata Core (Church/Pastor/User, fonte de verdade).",
   "license": "MIT",
   "type": "module",
