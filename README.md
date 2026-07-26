@@ -142,12 +142,18 @@ import { AppSwitcher } from "@paulo-brito-jr/maranata-suite-kit/app-switcher";
 
 ## Exports
 
-| Subpath           | Conteúdo                                                             |
-|-------------------|------------------------------------------------------------------------|
-| `./catalog`       | `MARANATA_SUITE_CATALOG`, `SuiteCatalogEntry`, `canonicalAppUrl()`      |
-| `./membership`    | `fetchMembershipApps()`, `MembershipApp`, `Papel`, `FetchMembershipAppsOptions` |
-| `./app-switcher`  | `AppSwitcher` (componente `"use client"`), `AppSwitcherProps`           |
-| `./fallback`      | `catalogAsApps()`                                                       |
+| Subpath | Conteúdo |
+|---|---|
+| `./core` | Cliente e tipos canônicos de Church/Pastor/User |
+| `./catalog` | `MARANATA_SUITE_CATALOG`, `SuiteCatalogEntry`, `canonicalAppUrl()` |
+| `./membership` | `fetchMembershipApps()`, `MembershipApp`, `Papel` |
+| `./app-switcher` | `AppSwitcher` (componente `"use client"`) |
+| `./fallback` | `catalogAsApps()` |
+| `./permissions` | Helpers para grants granulares |
+| `./pastoral` | Claim pastoral canônica |
+| `./lideranca` | Claim de liderança ministerial canônica |
+| `./integration-status` | Contrato `integration-status.v1` |
+| `./tutorial` | Contrato headless e `resolveTutorialVisibility()` |
 
 Sem export de `.` (raiz) — igual ao `brito-ai-kit`, só subpaths.
 
@@ -158,16 +164,107 @@ pnpm install      # devDependencies: typescript + @types/react (zero runtime dep
 pnpm build        # tsc -p tsconfig.build.json → dist/ (js + .d.ts, commitado)
 pnpm typecheck    # tsc --noEmit
 pnpm smoke        # node scripts/smoke.mjs — exercita canonicalAppUrl + catalogAsApps contra dist/
+pnpm test:tutorial-editorial # testa o validador dos manifestos da Fase 1
+pnpm test:tutorial-resolver  # build + testes do resolver fail-closed da Fase 2
 ```
 
 `dist/` é **commitado** (não gitignored) — é assim que os apps consumidores
 via submodule pegam o build pronto sem precisar rodar `tsc` neles mesmos.
 Sempre `pnpm build` antes de commitar uma mudança em `src/`.
 
+## Inventário editorial dos tutoriais
+
+A Fase 1 do programa de tutoriais usa um manifesto factual por app, antes do
+contrato executável:
+
+```text
+docs/tutorial/editorial-manifest.v1.json
+```
+
+O formato, o vocabulário de papéis efetivos/legados/reservados e as regras de
+evidência estão em
+[`docs/tutorial/editorial-manifest-v1.md`](docs/tutorial/editorial-manifest-v1.md).
+Para validar um ou mais artefatos sem instalar dependências:
+
+```bash
+node scripts/validate-tutorial-editorial-manifests.mjs \
+  ../maranata-key/docs/tutorial/editorial-manifest.v1.json \
+  ../agenda-maranata/docs/tutorial/editorial-manifest.v1.json
+```
+
+Esse manifesto é editorial. Tipos, schema e resolução server-side pertencem à
+Fase 2 e não devem ser inferidos como já entregues só porque o inventário
+passou.
+
+## Tutorial headless
+
+O subpath `./tutorial` contém o contrato executável
+`tutorial-manifest.v1`. Ele não interpreta as listas editoriais de papel,
+permissão ou escopo. Cada app mantém um adapter server-side que traduz sua
+sessão real em IDs de perfis já autorizados:
+
+```ts
+import {
+  resolveTutorialVisibility,
+  type StandardTutorialManifest,
+  type TutorialAccessDecision,
+} from "@paulo-brito-jr/maranata-suite-kit/tutorial";
+
+// Arquivo .server.ts do app consumidor.
+const access: TutorialAccessDecision = {
+  kind: "authenticated",
+  authorizedProfileIds: await resolveAuthorizedTutorialProfiles(session),
+  canPreviewAllProfiles: session.user.roles.includes("SUPER_ADMIN"),
+  view: { kind: "mine" },
+};
+
+const result = resolveTutorialVisibility(
+  tutorialManifest satisfies StandardTutorialManifest,
+  access,
+);
+
+if (!result.ok) {
+  // Não enviar manifesto bruto ao Client Component.
+  return <TutorialUnavailable code={result.code} />;
+}
+
+return <TutorialExplorer resolved={result} />;
+```
+
+Regras da fronteira:
+
+- sessão/claims inválidos viram `{ kind: "invalid" }`, nunca visitante;
+- `{ kind: "anonymous" }` é uma decisão explícita para conteúdo público;
+- usuário autenticado sem perfis continua distinto dos dois casos acima;
+- `authorizedProfileIds` já chega decidido pelo código real do app;
+- `canPreviewAllProfiles` é capability separada e, por padrão, exclusiva de
+  `SUPER_ADMIN`;
+- `preview-profile` e `all-profiles` selecionam documentação sintética, sem
+  impersonar usuário, alterar sessão ou consultar pessoas;
+- pedido de preview sem capability falha, sem fallback silencioso;
+- perfil desconhecido, drift de versão ou manifesto inválido fecham todo o
+  conteúdo;
+- audiência `{ kind: "public" }` modela conteúdo público sem inventar um
+  perfil `"public"`;
+- o schema valida integralmente tópicos, steps, mídias, captures e callouts;
+- tópico público aceita somente mídia marcada como `public-safe`;
+- desktop e mobile são variantes independentes, cada uma com capture, hash,
+  exposição e callouts próprios;
+- mídia usa caminho interno, de 1 a 4 callouts, e o perfil sintético da
+  captura precisa pertencer à audiência do tópico;
+- `private` não substitui ACL: a variante privada deve ser servida por rota
+  autenticada do app, nunca colocada em diretório público previsível;
+- o resultado remove audiências e jornadas proibidas antes de chegar ao
+  cliente.
+
+O resolver é puro, sem `server-only`, built-ins de Node ou dependência de
+runtime. A matriz do CI cobre Node 18, 20 e 22; a garantia server-side pertence
+ao adapter e à rota do consumidor.
+
 ## Dependências
 
-- **Peer:** `react >=18 <20` (opcional — só `./app-switcher` usa; os outros
-  3 subpaths são TypeScript puro, sem JSX).
+- **Peer:** `react >=18 <20` (opcional — só `./app-switcher` usa; os demais
+  subpaths são TypeScript puro, sem JSX).
 - **Runtime:** nenhuma. `./membership` usa `fetch`/`AbortSignal.timeout`
   nativos do runtime (Node 18+ / Edge / browser).
 - **Dev:** só `typescript` + `@types/react` (`.npmrc` fixa

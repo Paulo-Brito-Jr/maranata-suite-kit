@@ -1,7 +1,7 @@
 {
   "name": "@paulo-brito-jr/maranata-suite-kit",
-  "version": "0.7.0",
-  "description": "Kit da Suite Maranata — app switcher unificado (catálogo canônico + membership fail-soft + UI portátil) e cliente canônico do Maranata Core (Church/Pastor/User, fonte de verdade).",
+  "version": "0.8.0",
+  "description": "Kit da Suite Maranata — catálogo, membership, permissões, contratos canônicos e resolução headless de tutoriais.",
   "license": "MIT",
   "type": "module",
   "files": [
@@ -44,6 +44,10 @@
     "./integration-status": {
       "types": "./dist/integration-status.d.ts",
       "import": "./dist/integration-status.js"
+    },
+    "./tutorial": {
+      "types": "./dist/tutorial.d.ts",
+      "import": "./dist/tutorial.js"
     }
   },
   "scripts": {
@@ -52,6 +56,8 @@
     "lint": "echo '⚠️  pendência: eslint não configurado neste pacote ainda — nada pra lintar' && exit 0",
     "lint:strict": "echo '⚠️  pendência: eslint não configurado neste pacote ainda — nada pra lintar (adicionar quando o pacote crescer)' && exit 0",
     "smoke": "node scripts/smoke.mjs",
+    "test:tutorial-editorial": "node --test scripts/validate-tutorial-editorial-manifests.test.mjs",
+    "test:tutorial-resolver": "pnpm build && node --test scripts/tutorial.test.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
     "prepublishOnly": "npm run build"
   },
