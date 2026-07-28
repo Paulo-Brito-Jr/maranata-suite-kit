@@ -152,6 +152,7 @@ import { AppSwitcher } from "@paulo-brito-jr/maranata-suite-kit/app-switcher";
 | `./permissions` | Helpers para grants granulares |
 | `./pastoral` | Claim pastoral canônica |
 | `./lideranca` | Claim de liderança ministerial canônica |
+| `./servico` | Claim de funções de servir (EBD, discipulado, mentoria) — federada e empilhável |
 | `./integration-status` | Contrato `integration-status.v1` |
 | `./tutorial` | Contrato headless e `resolveTutorialVisibility()` |
 
