@@ -110,6 +110,23 @@ export const MARANATA_SUITE_CATALOG: Record<string, SuiteCatalogEntry> = {
     icon: "🛰️",
     cor: "#475569",
   },
+  tutorial: {
+    slug: "tutorial",
+    nome: "Tutoriais Maranata",
+    url: "https://tutorial.maranata.app",
+    icon: "📖",
+    cor: "#163970",
+  },
+  // O Key não tem entrada no MARANATA_SUITE_APPS (é o emissor do SSO, não um
+  // consumidor) — entra aqui direto pro observatório/switcher enxergarem o
+  // app mais crítico da suite.
+  key: {
+    slug: "key",
+    nome: "Maranata Key",
+    url: "https://key.maranata.app",
+    icon: "🔑",
+    cor: "#f97316",
+  },
   // InChurch é o painel de auditoria (não-Maranata, fica em britos.app por
   // decisão) — mantido aqui pra não regredir o comportamento hardcoded atual.
   "inchurch-dashboard": {
