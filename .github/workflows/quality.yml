@@ -51,6 +51,8 @@ jobs:
         run: pnpm run test:tutorial-editorial
       - name: Tutorial resolver
         run: node --test scripts/tutorial.test.mjs
+      - name: Pastoral parse (claim `funcoes`)
+        run: node --test scripts/pastoral.test.mjs
       - name: Tutorial package self-reference
         run: >-
           node --input-type=module -e "const mod = await

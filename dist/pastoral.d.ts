@@ -10,7 +10,15 @@
  *     tipo: "TITULAR" | "AUXILIAR" | "COLABORADOR",
  *     regime: "INTEGRAL" | "PARCIAL" | null,
  *     coreChurchId: string | null,   // igreja de lotação (Church.id do Core)
+ *     funcoes: string[],             // funções pastorais ADITIVAS — ver abaixo
  *   } | null
+ *
+ * `funcoes` é aditiva: além do tipo-base exclusivo acima (um pastor só tem
+ * UM tipo), ele pode acumular funções — hoje SENIOR, PRESIDENTE e
+ * ADMINISTRATIVO (ver `FUNCOES_PASTORAIS`). PRESIDENTE é único no sistema;
+ * essa unicidade é garantida no Core, não neste pacote. Campo aditivo e
+ * fail-soft: tokens antigos (emitidos antes do rollout) chegam sem
+ * `funcoes` — `parsePastoral` preenche `[]` nesse caso, nunca lança.
  *
  * Espelha `src/lib/pastoral.ts` do maranata-key. O que cada tipo/regime PODE
  * em cada app é a matriz dos grupos em key.maranata.app/admin/grupos — este
@@ -18,11 +26,20 @@
  */
 export type PastoralTipo = "TITULAR" | "AUXILIAR" | "COLABORADOR";
 export type PastoralRegime = "INTEGRAL" | "PARCIAL";
+/** Funções pastorais aditivas conhecidas (acumulam sobre o tipo-base). */
+export declare const FUNCOES_PASTORAIS: readonly ["SENIOR", "PRESIDENTE", "ADMINISTRATIVO"];
+export type FuncaoPastoral = (typeof FUNCOES_PASTORAIS)[number];
 export type PastoralInfo = {
     tipo: PastoralTipo;
     regime: PastoralRegime | null;
     /** Igreja de lotação do pastor (Church.id do Core) — escopo de permissão. */
     coreChurchId: string | null;
+    /**
+     * Funções pastorais aditivas (SENIOR/PRESIDENTE/ADMINISTRATIVO, ...) —
+     * acumulam sobre o `tipo` exclusivo. Sempre presente; `[]` quando o pastor
+     * não tem nenhuma função extra (ou o token é antigo, de antes do rollout).
+     */
+    funcoes: string[];
 };
 /** Slugs dos grupos canônicos no Key (informativo — via `groups` do JWT). */
 export declare const PASTORAL_GROUP_SLUGS: Record<PastoralTipo, string>;
@@ -39,6 +56,14 @@ export declare function isPastorAuxiliar(p: PastoralInfo | null | undefined): bo
 export declare function isPastorColaborador(p: PastoralInfo | null | undefined): boolean;
 export declare function isTempoIntegral(p: PastoralInfo | null | undefined): boolean;
 export declare function isTempoParcial(p: PastoralInfo | null | undefined): boolean;
+/**
+ * Checa uma função pastoral aditiva qualquer (aceita string livre — inclui
+ * futuras funções que o Core já emita antes deste pacote conhecê-las).
+ */
+export declare function temFuncaoPastoral(p: PastoralInfo | null | undefined, funcao: string): boolean;
+export declare function isPastorSenior(p: PastoralInfo | null | undefined): boolean;
+export declare function isPastorPresidente(p: PastoralInfo | null | undefined): boolean;
+export declare function isPastorAdministrativo(p: PastoralInfo | null | undefined): boolean;
 /**
  * Escopo por igreja: o usuário é pastor E está lotado na igreja dada
  * (Church.id do Core). É o gate padrão de "só mexe na própria igreja".
