@@ -55,6 +55,8 @@ jobs:
         run: node --test scripts/pastoral.test.mjs
       - name: Serviço parse (claim `servico`)
         run: node --test scripts/servico.test.mjs
+      - name: Grupos parse (detalhe de escopo por grupo)
+        run: node --test scripts/grupos.test.mjs
       - name: Tutorial package self-reference
         run: >-
           node --input-type=module -e "const mod = await
