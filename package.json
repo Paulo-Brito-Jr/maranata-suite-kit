@@ -56,6 +56,10 @@
     "./tutorial": {
       "types": "./dist/tutorial.d.ts",
       "import": "./dist/tutorial.js"
+    },
+    "./date": {
+      "types": "./dist/date.d.ts",
+      "import": "./dist/date.js"
     }
   },
   "scripts": {
@@ -69,6 +73,7 @@
     "test:pastoral": "pnpm build && node --test scripts/pastoral.test.mjs",
     "test:servico": "pnpm build && node --test scripts/servico.test.mjs",
     "test:grupos": "pnpm build && node --test scripts/grupos.test.mjs",
+    "test:date": "pnpm build && node --test scripts/date.test.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
     "prepublishOnly": "npm run build"
   },
