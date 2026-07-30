@@ -156,6 +156,7 @@ import { AppSwitcher } from "@paulo-brito-jr/maranata-suite-kit/app-switcher";
 | `./grupos` | Detalhe de escopo por grupo (GERAL/IGREJA/MINISTERIO/MINISTERIO_LOCAL/PILAR) — F2 do Permissionamento v3 |
 | `./integration-status` | Contrato `integration-status.v1` |
 | `./tutorial` | Contrato headless e `resolveTutorialVisibility()` |
+| `./date` | Fuso de Brasília: `parseDataHoraBRT()`, `inicioDoDiaBRT()`/`fimDoDiaBRT()`, `formatarDataBRT()`, `dataISOBRT()` — os apps rodam em servidor UTC |
 
 Sem export de `.` (raiz) — igual ao `brito-ai-kit`, só subpaths.
 
@@ -168,6 +169,7 @@ pnpm typecheck    # tsc --noEmit
 pnpm smoke        # node scripts/smoke.mjs — exercita canonicalAppUrl + catalogAsApps contra dist/
 pnpm test:tutorial-editorial # testa o validador dos manifestos da Fase 1
 pnpm test:tutorial-resolver  # build + testes do resolver fail-closed da Fase 2
+pnpm test:date               # build + testes do módulo de fuso BRT
 ```
 
 `dist/` é **commitado** (não gitignored) — é assim que os apps consumidores
