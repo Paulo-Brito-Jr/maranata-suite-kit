@@ -61,6 +61,8 @@ jobs:
         run: node --test scripts/date.test.mjs
       - name: Permissions consumo (golden matrix do contrato)
         run: node --test scripts/permissions.test.mjs
+      - name: SSO (host canônico, montagem de URL, verify fail-soft)
+        run: node --test scripts/sso.test.mjs
       - name: Tutorial package self-reference
         run: >-
           node --input-type=module -e "const mod = await
