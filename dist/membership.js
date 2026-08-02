@@ -12,7 +12,8 @@ function readEnv(name) {
     const proc = globalThis.process;
     return proc?.env?.[name];
 }
-const PAPEIS_VALIDOS = ["ADMIN", "USUARIO", "VIEWER"];
+const PAPEIS_VALIDOS = ["ADMIN", "ADMIN_SEM_EXCLUIR", "USUARIO", "VIEWER"];
+const VIAS_VALIDAS = new Set(["direct", "group", "role", "federated"]);
 function isPapel(value) {
     return typeof value === "string" && PAPEIS_VALIDOS.includes(value);
 }
@@ -64,7 +65,9 @@ export async function fetchMembershipApps(options) {
                 nome: raw.nome,
                 url,
                 papel: raw.papel,
-                via: raw.via === "group" ? "group" : "direct",
+                via: (typeof raw.via === "string" && VIAS_VALIDAS.has(raw.via)
+                    ? raw.via
+                    : "direct"),
             });
         }
         return apps;
