@@ -1,6 +1,6 @@
 {
   "name": "@paulo-brito-jr/maranata-suite-kit",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Kit da Suite Maranata — catálogo, membership, permissões, contratos canônicos e resolução headless de tutoriais.",
   "license": "MIT",
   "type": "module",
@@ -68,6 +68,11 @@
       "types": "./dist/tutorial.d.ts",
       "import": "./dist/tutorial.js",
       "default": "./dist/tutorial.js"
+    },
+    "./date": {
+      "types": "./dist/date.d.ts",
+      "import": "./dist/date.js",
+      "default": "./dist/date.js"
     }
   },
   "scripts": {
@@ -83,7 +88,8 @@
     "test:grupos": "pnpm build && node --test scripts/grupos.test.mjs",
     "test:permissions": "pnpm build && node --test scripts/permissions.test.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test:date": "pnpm build && node --test scripts/date.test.mjs"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
