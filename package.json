@@ -81,6 +81,7 @@
     "test:pastoral": "pnpm build && node --test scripts/pastoral.test.mjs",
     "test:servico": "pnpm build && node --test scripts/servico.test.mjs",
     "test:grupos": "pnpm build && node --test scripts/grupos.test.mjs",
+    "test:permissions": "pnpm build && node --test scripts/permissions.test.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
     "prepublishOnly": "npm run build"
   },
