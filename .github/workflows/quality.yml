@@ -15,19 +15,23 @@ env:
   DIRECT_URL: "postgresql://ci:ci@localhost:5432/ci"
 
 jobs:
-  quality:
-    name: quality
+  quality_matrix:
+    name: quality (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.33.3
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -35,15 +39,57 @@ jobs:
         run: if [ -f prisma/schema.prisma ]; then pnpm exec prisma generate; fi
       - name: Typecheck
         run: pnpm run typecheck
-      - name: Lint (strict)
-        run: pnpm run lint:strict
+      - name: Build and verify committed dist
+        run: |
+          rm -rf -- dist
+          pnpm run build
+          if [ -n "$(git status --porcelain --untracked-files=all -- dist)" ]; then
+            git status --short --untracked-files=all -- dist
+            exit 1
+          fi
+      - name: Tutorial editorial manifests
+        run: pnpm run test:tutorial-editorial
+      - name: Tutorial resolver
+        run: node --test scripts/tutorial.test.mjs
+      - name: Pastoral parse (claim `funcoes`)
+        run: node --test scripts/pastoral.test.mjs
+      - name: Serviço parse (claim `servico`)
+        run: node --test scripts/servico.test.mjs
+      - name: Grupos parse (detalhe de escopo por grupo)
+        run: node --test scripts/grupos.test.mjs
+      - name: Date BRT (fuso canônico da suite)
+        run: node --test scripts/date.test.mjs
+      - name: Permissions consumo (golden matrix do contrato)
+        run: node --test scripts/permissions.test.mjs
+      - name: Tutorial package self-reference
+        run: >-
+          node --input-type=module -e "const mod = await
+          import('@paulo-brito-jr/maranata-suite-kit/tutorial'); if (typeof
+          mod.resolveTutorialVisibility !== 'function') throw new
+          Error('tutorial export ausente')"
+      - name: Smoke
+        run: pnpm run smoke
+
+  quality:
+    name: quality
+    if: always()
+    needs: quality_matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every supported Node version
+        env:
+          MATRIX_RESULT: ${{ needs.quality_matrix.result }}
+        run: |
+          if [ "$MATRIX_RESULT" != "success" ]; then
+            exit 1
+          fi
 
   secrets:
     name: secrets
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Scan PR diff for secrets (gitleaks)

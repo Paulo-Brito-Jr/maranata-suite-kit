@@ -46,6 +46,12 @@ export type CorePastor = {
     id: string;
     name: string;
     role: string;
+    /**
+     * Funções pastorais aditivas (SENIOR/PRESIDENTE/ADMINISTRATIVO, ...) —
+     * acumulam sobre `role`. Opcional: o Core pode ainda não retornar este
+     * campo durante o rollout (ver `@paulo-brito-jr/maranata-suite-kit/pastoral`).
+     */
+    funcoes?: string[];
     isFullTime: boolean;
     onLeave: boolean;
     email: string | null;

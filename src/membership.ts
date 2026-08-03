@@ -5,14 +5,15 @@ import { canonicalAppUrl } from "./catalog.js";
  * Espelha `EffectiveApp` de
  * /Users/paulobrito/dev/maranata-key/src/lib/membership.ts
  */
-export type Papel = "ADMIN" | "USUARIO" | "VIEWER";
+export type Papel = "ADMIN" | "ADMIN_SEM_EXCLUIR" | "USUARIO" | "VIEWER";
 
 export type MembershipApp = {
   slug: string;
   nome: string;
   url: string;
   papel: Papel;
-  via: "direct" | "group";
+  /** "role" = full-access por MemberRole; "federated" = super admin da família via Brito Auth. */
+  via: "direct" | "group" | "role" | "federated";
 };
 
 export type FetchMembershipAppsOptions = {
@@ -48,7 +49,9 @@ function readEnv(name: string): string | undefined {
   return proc?.env?.[name];
 }
 
-const PAPEIS_VALIDOS: readonly Papel[] = ["ADMIN", "USUARIO", "VIEWER"];
+const PAPEIS_VALIDOS: readonly Papel[] = ["ADMIN", "ADMIN_SEM_EXCLUIR", "USUARIO", "VIEWER"];
+
+const VIAS_VALIDAS = new Set(["direct", "group", "role", "federated"]);
 
 function isPapel(value: unknown): value is Papel {
   return typeof value === "string" && (PAPEIS_VALIDOS as readonly string[]).includes(value);
@@ -116,7 +119,9 @@ export async function fetchMembershipApps(
         nome: raw.nome,
         url,
         papel: raw.papel,
-        via: raw.via === "group" ? "group" : "direct",
+        via: (typeof raw.via === "string" && VIAS_VALIDAS.has(raw.via)
+          ? raw.via
+          : "direct") as MembershipApp["via"],
       });
     }
     return apps;

@@ -8,15 +8,19 @@ updates:
     open-pull-requests-limit: 3
     labels: ["dependencies"]
     # Prisma 7 e uma migracao estrutural (schema.prisma -> prisma.config.ts),
-    # nao um bump: fica fora do grupo ate o projeto de migracao dedicado.
+    # nao um bump: fica fora ate o projeto de migracao dedicado.
     ignore:
       - dependency-name: "prisma"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@prisma/*"
         update-types: ["version-update:semver-major"]
+    # Grupo semanal SO com minor/patch (major de toolchain quebra em serie —
+    # ex.: eslint 10 x eslint-plugin-react). Majors chegam como PRs
+    # individuais, avaliados um a um (limit 3 controla o fluxo).
     groups:
       todas-as-deps:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

@@ -3,13 +3,14 @@
  * Espelha `EffectiveApp` de
  * /Users/paulobrito/dev/maranata-key/src/lib/membership.ts
  */
-export type Papel = "ADMIN" | "USUARIO" | "VIEWER";
+export type Papel = "ADMIN" | "ADMIN_SEM_EXCLUIR" | "USUARIO" | "VIEWER";
 export type MembershipApp = {
     slug: string;
     nome: string;
     url: string;
     papel: Papel;
-    via: "direct" | "group";
+    /** "role" = full-access por MemberRole; "federated" = super admin da família via Brito Auth. */
+    via: "direct" | "group" | "role" | "federated";
 };
 export type FetchMembershipAppsOptions = {
     /** E-mail do membro (mesma chave usada como identidade no maranata-key). */

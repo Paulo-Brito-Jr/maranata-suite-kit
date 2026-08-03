@@ -1,7 +1,7 @@
 {
   "name": "@paulo-brito-jr/maranata-suite-kit",
-  "version": "0.6.1",
-  "description": "Kit da Suite Maranata — app switcher unificado (catálogo canônico + membership fail-soft + UI portátil) e cliente canônico do Maranata Core (Church/Pastor/User, fonte de verdade).",
+  "version": "0.13.0",
+  "description": "Kit da Suite Maranata — catálogo, membership, permissões, contratos canônicos e resolução headless de tutoriais.",
   "license": "MIT",
   "type": "module",
   "files": [
@@ -11,35 +11,68 @@
   "exports": {
     "./core": {
       "types": "./dist/core.d.ts",
-      "import": "./dist/core.js"
+      "import": "./dist/core.js",
+      "default": "./dist/core.js"
     },
     "./catalog": {
       "types": "./dist/catalog.d.ts",
-      "import": "./dist/catalog.js"
+      "import": "./dist/catalog.js",
+      "default": "./dist/catalog.js"
     },
     "./membership": {
       "types": "./dist/membership.d.ts",
-      "import": "./dist/membership.js"
+      "import": "./dist/membership.js",
+      "default": "./dist/membership.js"
     },
     "./app-switcher": {
       "types": "./dist/app-switcher.d.ts",
-      "import": "./dist/app-switcher.js"
+      "import": "./dist/app-switcher.js",
+      "default": "./dist/app-switcher.js"
     },
     "./fallback": {
       "types": "./dist/fallback.d.ts",
-      "import": "./dist/fallback.js"
+      "import": "./dist/fallback.js",
+      "default": "./dist/fallback.js"
     },
     "./permissions": {
       "types": "./dist/permissions.d.ts",
-      "import": "./dist/permissions.js"
+      "import": "./dist/permissions.js",
+      "default": "./dist/permissions.js"
     },
     "./pastoral": {
       "types": "./dist/pastoral.d.ts",
-      "import": "./dist/pastoral.js"
+      "import": "./dist/pastoral.js",
+      "default": "./dist/pastoral.js"
     },
     "./lideranca": {
       "types": "./dist/lideranca.d.ts",
-      "import": "./dist/lideranca.js"
+      "import": "./dist/lideranca.js",
+      "default": "./dist/lideranca.js"
+    },
+    "./servico": {
+      "types": "./dist/servico.d.ts",
+      "import": "./dist/servico.js",
+      "default": "./dist/servico.js"
+    },
+    "./grupos": {
+      "types": "./dist/grupos.d.ts",
+      "import": "./dist/grupos.js",
+      "default": "./dist/grupos.js"
+    },
+    "./integration-status": {
+      "types": "./dist/integration-status.d.ts",
+      "import": "./dist/integration-status.js",
+      "default": "./dist/integration-status.js"
+    },
+    "./tutorial": {
+      "types": "./dist/tutorial.d.ts",
+      "import": "./dist/tutorial.js",
+      "default": "./dist/tutorial.js"
+    },
+    "./date": {
+      "types": "./dist/date.d.ts",
+      "import": "./dist/date.js",
+      "default": "./dist/date.js"
     }
   },
   "scripts": {
@@ -48,8 +81,15 @@
     "lint": "echo '⚠️  pendência: eslint não configurado neste pacote ainda — nada pra lintar' && exit 0",
     "lint:strict": "echo '⚠️  pendência: eslint não configurado neste pacote ainda — nada pra lintar (adicionar quando o pacote crescer)' && exit 0",
     "smoke": "node scripts/smoke.mjs",
+    "test:tutorial-editorial": "node --test scripts/validate-tutorial-editorial-manifests.test.mjs",
+    "test:tutorial-resolver": "pnpm build && node --test scripts/tutorial.test.mjs",
+    "test:pastoral": "pnpm build && node --test scripts/pastoral.test.mjs",
+    "test:servico": "pnpm build && node --test scripts/servico.test.mjs",
+    "test:grupos": "pnpm build && node --test scripts/grupos.test.mjs",
+    "test:permissions": "pnpm build && node --test scripts/permissions.test.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test:date": "pnpm build && node --test scripts/date.test.mjs"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",
