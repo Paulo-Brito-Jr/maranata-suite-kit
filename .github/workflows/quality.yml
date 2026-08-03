@@ -57,6 +57,8 @@ jobs:
         run: node --test scripts/servico.test.mjs
       - name: Grupos parse (detalhe de escopo por grupo)
         run: node --test scripts/grupos.test.mjs
+      - name: Date BRT (fuso canônico da suite)
+        run: node --test scripts/date.test.mjs
       - name: Permissions consumo (golden matrix do contrato)
         run: node --test scripts/permissions.test.mjs
       - name: Tutorial package self-reference
