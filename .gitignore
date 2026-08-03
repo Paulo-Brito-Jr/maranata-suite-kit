@@ -1,4 +1,13 @@
 node_modules/
+
+# `dist/` É versionado neste pacote — os apps consomem o kit como submódulo
+# git, importando direto de `dist/`, e o CI verifica byte a byte que o dist
+# commitado bate com o build. A negação existe porque `dist/` é regra comum
+# em gitignore GLOBAL (~/.gitignore_global): sem ela, quem tiver essa config
+# adiciona um módulo novo, o `dist/<modulo>.js` não entra no commit em
+# silêncio, e todo app que importar o subpath quebra em runtime.
+!dist/
+
 .env
 .env.local
 .DS_Store

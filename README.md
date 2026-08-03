@@ -150,6 +150,7 @@ import { AppSwitcher } from "@paulo-brito-jr/maranata-suite-kit/app-switcher";
 | `./app-switcher` | `AppSwitcher` (componente `"use client"`) |
 | `./fallback` | `catalogAsApps()` |
 | `./permissions` | Helpers para grants granulares |
+| `./sso` | Handshake com o Key: `maranataKeyStartUrl()`, `maranataKeyLogoutUrl()`, `verifyMaranataKeyToken()`, `maranataKeyBaseUrl()` |
 | `./pastoral` | Claim pastoral canônica |
 | `./lideranca` | Claim de liderança ministerial canônica |
 | `./servico` | Claim de funções de servir (EBD, discipulado, mentoria) — federada e empilhável |
