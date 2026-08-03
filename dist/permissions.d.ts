@@ -12,7 +12,9 @@
  * Camadas resolvidas pelo Key (o app cliente NÃO precisa recalcular):
  *   papel no app (ADMIN=tudo · USUARIO=view+create+edit · VIEWER=view)
  *   ∪ categorias (grupos) ∪ overrides individuais (deny vence tudo).
- * SUPER_ADMIN e DESENVOLVEDOR chegam com todas as ações em todos os recursos.
+ * Só SUPER_ADMIN chega com todas as ações em todos os recursos (desde
+ * 2026-07-30 DESENVOLVEDOR é papel-rótulo — o alcance de um dev vem dos
+ * perfis dev-l1/dev-l2/dev-l3, como qualquer grupo).
  */
 export type PermActionLower = "view" | "create" | "edit" | "delete" | "manage";
 /** Permissões de UM app: slug do recurso → ações concedidas (minúsculas). */
