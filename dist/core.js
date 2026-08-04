@@ -107,6 +107,10 @@ export function createCoreClient(options) {
             qs.set("church", opts.church);
         if (opts.role)
             qs.set("role", opts.role);
+        // Inclui quem tem status SAIU (tombstone) — só pra espelhos/sync que
+        // precisam propagar a saída; telas normais usam o default (só ATIVO).
+        if (opts.includeInactive)
+            qs.set("incluirInativos", "true");
         const suffix = qs.toString() ? `?${qs}` : "";
         return getJson(`/api/pastores${suffix}`, ["core:pastores"]);
     }

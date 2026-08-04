@@ -20,5 +20,5 @@ export type AppSwitcherProps = {
  * lib de ícones tipo lucide) com fallback pra inicial do nome quando o slug
  * não está (ainda) no catálogo sincronizado.
  */
-export declare function AppSwitcher({ apps, currentSlug, className }: AppSwitcherProps): import("react").JSX.Element | null;
+export declare function AppSwitcher({ apps, currentSlug, className }: AppSwitcherProps): import("react/jsx-runtime").JSX.Element | null;
 //# sourceMappingURL=app-switcher.d.ts.map

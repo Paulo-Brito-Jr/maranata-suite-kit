@@ -54,6 +54,15 @@ export type CorePastor = {
     funcoes?: string[];
     isFullTime: boolean;
     onLeave: boolean;
+    /**
+     * Lifecycle do ministro no Core: "ATIVO" | "SAIU" (deixou o ministério —
+     * tombstone preservado). O GET default do Core só devolve ATIVO; espelhos
+     * que propagam a saída pedem `listPastores({ includeInactive: true })`.
+     * Opcional: o Core pode ainda não retornar o campo durante o rollout.
+     */
+    status?: string;
+    saidaEm?: string | null;
+    saidaMotivo?: string | null;
     email: string | null;
     phone: string | null;
     birthday?: string | null;
@@ -122,6 +131,7 @@ export declare function createCoreClient(options: CoreClientOptions): {
     listPastores: (opts?: {
         church?: string;
         role?: string;
+        includeInactive?: boolean;
     }) => Promise<{
         total: number;
         pastores: CorePastor[];
