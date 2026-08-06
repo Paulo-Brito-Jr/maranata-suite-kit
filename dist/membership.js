@@ -1,5 +1,5 @@
 import { canonicalAppUrl } from "./catalog.js";
-const DEFAULT_KEY_URL = "https://auth.maranata.app";
+const DEFAULT_KEY_URL = "https://key.maranata.app";
 /**
  * Lê `process.env[name]` sem depender de `@types/node` (este pacote não
  * instala @types/node de propósito — ver README "Pendências conhecidas").
@@ -12,13 +12,19 @@ function readEnv(name) {
     const proc = globalThis.process;
     return proc?.env?.[name];
 }
-const PAPEIS_VALIDOS = ["ADMIN", "ADMIN_SEM_EXCLUIR", "USUARIO", "VIEWER"];
+const PAPEIS_VALIDOS = [
+    "ADMIN",
+    "ADMIN_SEM_EXCLUIR",
+    "USUARIO",
+    "VIEWER",
+    "ACESSO",
+];
 const VIAS_VALIDAS = new Set(["direct", "group", "role", "federated"]);
 function isPapel(value) {
     return typeof value === "string" && PAPEIS_VALIDOS.includes(value);
 }
 /**
- * Busca os apps efetivos de um membro no maranata-key (fonte de identidade
+ * Busca os apps efetivos de uma conta no maranata-key (fonte de identidade
  * da Suite Maranata — GET /api/membership/{email}).
  *
  * Server-to-server: `Authorization: Bearer <integrationKey>` + `x-source`,

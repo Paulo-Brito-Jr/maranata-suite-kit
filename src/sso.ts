@@ -87,7 +87,7 @@ export function maranataKeyBaseUrl(keyUrl?: string): string {
   return limpo === "" ? DEFAULT_KEY_AUTH_URL : limpo;
 }
 
-export type SsoUrlOptions = {
+type SsoBaseUrlOptions = {
   /** Modo de login. `"mk"` é o default do Key e não vai na query. */
   mode?: SsoLoginMode;
   /** Força nova autenticação mesmo com sessão viva (`force=1`). */
@@ -97,22 +97,73 @@ export type SsoUrlOptions = {
 };
 
 /**
+ * Prova PKCE do início do handshake. O challenge SHA-256 é sempre base64url
+ * sem padding (43 caracteres); o Key não aceita `plain`.
+ */
+export type SsoPkceStartOptions = {
+  codeChallenge: string;
+  codeChallengeMethod: "S256";
+};
+
+type SsoWithoutPkce = {
+  codeChallenge?: never;
+  codeChallengeMethod?: never;
+};
+
+/**
+ * Opções do início do SSO.
+ *
+ * O literal `"ibm"` torna PKCE obrigatório também no type system. Apps
+ * legados continuam podendo omitir PKCE; se optarem por usá-lo, precisam
+ * enviar o par challenge + método S256 completo.
+ */
+export type SsoUrlOptions<AppId extends string = string> = SsoBaseUrlOptions &
+  ([AppId] extends ["ibm"] ? SsoPkceStartOptions : SsoPkceStartOptions | SsoWithoutPkce);
+
+const PKCE_S256_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
+const PKCE_CODE_VERIFIER = /^[A-Za-z0-9._~-]{43,128}$/;
+
+function pkceStartValido(options: SsoUrlOptions): options is SsoUrlOptions & SsoPkceStartOptions {
+  return (
+    options.codeChallengeMethod === "S256" &&
+    typeof options.codeChallenge === "string" &&
+    PKCE_S256_CHALLENGE.test(options.codeChallenge)
+  );
+}
+
+/**
  * URL de início do handshake: manda a pessoa ao Key e volta para `returnUrl`.
  *
  * ⚠️ O Key só libera retorno para as URLs canônicas de cada app
  * (`maranata-key/src/lib/maranata-suite.ts`). Rodar local numa porta
  * não-canônica quebra o SSO **em silêncio** — gotcha conhecido da Suite.
  */
-export function maranataKeyStartUrl(
-  appId: string,
+export function maranataKeyStartUrl<const AppId extends string>(
+  appId: AppId,
   returnUrl: string,
-  options: SsoUrlOptions = {},
+  ...args: [AppId] extends ["ibm"]
+    ? [options: SsoUrlOptions<AppId>]
+    : [options?: SsoUrlOptions<AppId>]
 ): string {
+  const options = (args[0] ?? {}) as SsoUrlOptions;
+  const informouPkce =
+    options.codeChallenge !== undefined || options.codeChallengeMethod !== undefined;
+
+  if ((appId === "ibm" || informouPkce) && !pkceStartValido(options)) {
+    throw new TypeError(
+      "Maranata Key SSO exige PKCE S256 com codeChallenge base64url de 43 caracteres.",
+    );
+  }
+
   const u = new URL(`${maranataKeyBaseUrl(options.keyUrl)}/api/sso/start`);
   u.searchParams.set("app", appId);
   u.searchParams.set("return", returnUrl);
   if (options.mode && options.mode !== "mk") u.searchParams.set("mode", options.mode);
   if (options.force) u.searchParams.set("force", "1");
+  if (pkceStartValido(options)) {
+    u.searchParams.set("code_challenge", options.codeChallenge);
+    u.searchParams.set("code_challenge_method", options.codeChallengeMethod);
+  }
   return u.toString();
 }
 
@@ -120,7 +171,7 @@ export function maranataKeyStartUrl(
 export function maranataKeyLogoutUrl(
   appId: string,
   returnUrl: string,
-  options: Pick<SsoUrlOptions, "keyUrl"> = {},
+  options: Pick<SsoBaseUrlOptions, "keyUrl"> = {},
 ): string {
   const u = new URL(`${maranataKeyBaseUrl(options.keyUrl)}/api/sso/logout`);
   u.searchParams.set("app", appId);
@@ -148,6 +199,12 @@ export type MaranataKeyUser = {
   name: string;
   /** MemberRole global da Suite. */
   role?: string;
+  /** Vínculo eclesiástico explícito; ausente em tickets legados. */
+  identityKind?: "CHURCH_MEMBER" | "EXTERNAL" | null;
+  /** App ao qual o ticket curto foi emitido. */
+  targetApp?: string;
+  /** Versão monotônica das autorizações no Key, usada para revogação. */
+  authzVersion?: number;
   coreUserId?: string;
   coreChurchId?: string;
   groups?: string[];
@@ -159,7 +216,7 @@ export type MaranataKeyUser = {
   lideranca?: unknown;
 };
 
-export type VerifyTokenOptions = {
+type VerifyTokenBaseOptions = {
   /** Sobrescreve a base URL do Key (precede `MARANATA_KEY_AUTH_URL`). */
   keyUrl?: string;
   /**
@@ -175,6 +232,19 @@ export type VerifyTokenOptions = {
 };
 
 /**
+ * Opções de verificação vinculadas ao app consumidor.
+ *
+ * Para `app: "ibm"`, o verifier correspondente ao challenge do início é
+ * obrigatório. Apps legados preservam o contrato anterior e podem omiti-lo.
+ */
+export type VerifyTokenOptions<AppId extends string | undefined = string | undefined> =
+  VerifyTokenBaseOptions &
+    { app?: AppId } &
+    ([AppId] extends ["ibm"]
+      ? { app: "ibm"; codeVerifier: string }
+      : { codeVerifier?: string });
+
+/**
  * Verifica o token do handshake no Key.
  *
  * **Fail-soft:** devolve `null` para token inválido, Key fora do ar, resposta
@@ -182,13 +252,23 @@ export type VerifyTokenOptions = {
  * tinham, e o certo aqui: quem chama trata `null` como "não autenticado", e
  * um erro de rede não deve virar 500 na cara do usuário.
  */
-export async function verifyMaranataKeyToken(
+export async function verifyMaranataKeyToken<
+  const AppId extends string | undefined = undefined,
+>(
   token: string,
-  options: VerifyTokenOptions = {},
+  ...args: [AppId] extends ["ibm"]
+    ? [options: VerifyTokenOptions<AppId>]
+    : [options?: VerifyTokenOptions<AppId>]
 ): Promise<MaranataKeyUser | null> {
-  const { keyUrl, timeoutMs = 5000, fetchImpl } = options;
+  const options = (args[0] ?? {}) as VerifyTokenOptions;
+  const { keyUrl, app, codeVerifier, timeoutMs = 5000, fetchImpl } = options;
   const doFetch = fetchImpl ?? globalThis.fetch;
   if (typeof doFetch !== "function") return null;
+
+  // O IBM nunca possui o fallback legado: sem verifier válido, nem toca o Key.
+  // Para outros apps, um verifier informado também precisa ser RFC 7636 válido.
+  if (app === "ibm" && !codeVerifier) return null;
+  if (codeVerifier !== undefined && !PKCE_CODE_VERIFIER.test(codeVerifier)) return null;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -196,7 +276,11 @@ export async function verifyMaranataKeyToken(
     const r = await doFetch(`${maranataKeyBaseUrl(keyUrl)}/api/auth/verify`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({
+        token,
+        ...(app ? { app } : {}),
+        ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
+      }),
       cache: "no-store",
       signal: controller.signal,
     });

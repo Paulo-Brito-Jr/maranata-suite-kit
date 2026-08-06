@@ -62,7 +62,7 @@ export declare const MARANATA_KEY_PORTAL_URL = "https://key.maranata.app";
  * testes e para um app que precise falar com uma instância específica.
  */
 export declare function maranataKeyBaseUrl(keyUrl?: string): string;
-export type SsoUrlOptions = {
+type SsoBaseUrlOptions = {
     /** Modo de login. `"mk"` é o default do Key e não vai na query. */
     mode?: SsoLoginMode;
     /** Força nova autenticação mesmo com sessão viva (`force=1`). */
@@ -71,15 +71,35 @@ export type SsoUrlOptions = {
     keyUrl?: string;
 };
 /**
+ * Prova PKCE do início do handshake. O challenge SHA-256 é sempre base64url
+ * sem padding (43 caracteres); o Key não aceita `plain`.
+ */
+export type SsoPkceStartOptions = {
+    codeChallenge: string;
+    codeChallengeMethod: "S256";
+};
+type SsoWithoutPkce = {
+    codeChallenge?: never;
+    codeChallengeMethod?: never;
+};
+/**
+ * Opções do início do SSO.
+ *
+ * O literal `"ibm"` torna PKCE obrigatório também no type system. Apps
+ * legados continuam podendo omitir PKCE; se optarem por usá-lo, precisam
+ * enviar o par challenge + método S256 completo.
+ */
+export type SsoUrlOptions<AppId extends string = string> = SsoBaseUrlOptions & ([AppId] extends ["ibm"] ? SsoPkceStartOptions : SsoPkceStartOptions | SsoWithoutPkce);
+/**
  * URL de início do handshake: manda a pessoa ao Key e volta para `returnUrl`.
  *
  * ⚠️ O Key só libera retorno para as URLs canônicas de cada app
  * (`maranata-key/src/lib/maranata-suite.ts`). Rodar local numa porta
  * não-canônica quebra o SSO **em silêncio** — gotcha conhecido da Suite.
  */
-export declare function maranataKeyStartUrl(appId: string, returnUrl: string, options?: SsoUrlOptions): string;
+export declare function maranataKeyStartUrl<const AppId extends string>(appId: AppId, returnUrl: string, ...args: [AppId] extends ["ibm"] ? [options: SsoUrlOptions<AppId>] : [options?: SsoUrlOptions<AppId>]): string;
 /** URL de logout do SSO, voltando para `returnUrl`. */
-export declare function maranataKeyLogoutUrl(appId: string, returnUrl: string, options?: Pick<SsoUrlOptions, "keyUrl">): string;
+export declare function maranataKeyLogoutUrl(appId: string, returnUrl: string, options?: Pick<SsoBaseUrlOptions, "keyUrl">): string;
 /**
  * Usuário devolvido pelo `/api/auth/verify`.
  *
@@ -100,6 +120,12 @@ export type MaranataKeyUser = {
     name: string;
     /** MemberRole global da Suite. */
     role?: string;
+    /** Vínculo eclesiástico explícito; ausente em tickets legados. */
+    identityKind?: "CHURCH_MEMBER" | "EXTERNAL" | null;
+    /** App ao qual o ticket curto foi emitido. */
+    targetApp?: string;
+    /** Versão monotônica das autorizações no Key, usada para revogação. */
+    authzVersion?: number;
     coreUserId?: string;
     coreChurchId?: string;
     groups?: string[];
@@ -113,7 +139,7 @@ export type MaranataKeyUser = {
     /** Claim de ecossistema — parse com `./lideranca`. */
     lideranca?: unknown;
 };
-export type VerifyTokenOptions = {
+type VerifyTokenBaseOptions = {
     /** Sobrescreve a base URL do Key (precede `MARANATA_KEY_AUTH_URL`). */
     keyUrl?: string;
     /**
@@ -128,6 +154,20 @@ export type VerifyTokenOptions = {
     fetchImpl?: typeof fetch;
 };
 /**
+ * Opções de verificação vinculadas ao app consumidor.
+ *
+ * Para `app: "ibm"`, o verifier correspondente ao challenge do início é
+ * obrigatório. Apps legados preservam o contrato anterior e podem omiti-lo.
+ */
+export type VerifyTokenOptions<AppId extends string | undefined = string | undefined> = VerifyTokenBaseOptions & {
+    app?: AppId;
+} & ([AppId] extends ["ibm"] ? {
+    app: "ibm";
+    codeVerifier: string;
+} : {
+    codeVerifier?: string;
+});
+/**
  * Verifica o token do handshake no Key.
  *
  * **Fail-soft:** devolve `null` para token inválido, Key fora do ar, resposta
@@ -135,5 +175,6 @@ export type VerifyTokenOptions = {
  * tinham, e o certo aqui: quem chama trata `null` como "não autenticado", e
  * um erro de rede não deve virar 500 na cara do usuário.
  */
-export declare function verifyMaranataKeyToken(token: string, options?: VerifyTokenOptions): Promise<MaranataKeyUser | null>;
+export declare function verifyMaranataKeyToken<const AppId extends string | undefined = undefined>(token: string, ...args: [AppId] extends ["ibm"] ? [options: VerifyTokenOptions<AppId>] : [options?: VerifyTokenOptions<AppId>]): Promise<MaranataKeyUser | null>;
+export {};
 //# sourceMappingURL=sso.d.ts.map
