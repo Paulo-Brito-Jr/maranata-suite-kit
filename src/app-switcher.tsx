@@ -6,7 +6,7 @@ import { MARANATA_SUITE_CATALOG } from "./catalog.js";
 import type { MembershipApp } from "./membership.js";
 
 export type AppSwitcherProps = {
-  /** Apps do membro — de `fetchMembershipApps` (`./membership`) ou `catalogAsApps` (`./fallback`). */
+  /** Apps da conta — de `fetchMembershipApps` (`./membership`) ou `catalogAsApps` (`./fallback`). */
   apps: MembershipApp[];
   /** Slug do app atual: ganha checkmark e não abre em nova aba. */
   currentSlug?: string | null;

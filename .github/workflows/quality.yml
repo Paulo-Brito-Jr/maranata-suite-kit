@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main, master]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -47,6 +48,8 @@ jobs:
             git status --short --untracked-files=all -- dist
             exit 1
           fi
+      - name: SSO type contract (IBM PKCE required)
+        run: pnpm run test:sso-types
       - name: Tutorial editorial manifests
         run: pnpm run test:tutorial-editorial
       - name: Tutorial resolver

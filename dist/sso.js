@@ -78,6 +78,13 @@ export function maranataKeyBaseUrl(keyUrl) {
     const limpo = semBarraFinal(bruto.trim());
     return limpo === "" ? DEFAULT_KEY_AUTH_URL : limpo;
 }
+const PKCE_S256_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
+const PKCE_CODE_VERIFIER = /^[A-Za-z0-9._~-]{43,128}$/;
+function pkceStartValido(options) {
+    return (options.codeChallengeMethod === "S256" &&
+        typeof options.codeChallenge === "string" &&
+        PKCE_S256_CHALLENGE.test(options.codeChallenge));
+}
 /**
  * URL de início do handshake: manda a pessoa ao Key e volta para `returnUrl`.
  *
@@ -85,7 +92,12 @@ export function maranataKeyBaseUrl(keyUrl) {
  * (`maranata-key/src/lib/maranata-suite.ts`). Rodar local numa porta
  * não-canônica quebra o SSO **em silêncio** — gotcha conhecido da Suite.
  */
-export function maranataKeyStartUrl(appId, returnUrl, options = {}) {
+export function maranataKeyStartUrl(appId, returnUrl, ...args) {
+    const options = (args[0] ?? {});
+    const informouPkce = options.codeChallenge !== undefined || options.codeChallengeMethod !== undefined;
+    if ((appId === "ibm" || informouPkce) && !pkceStartValido(options)) {
+        throw new TypeError("Maranata Key SSO exige PKCE S256 com codeChallenge base64url de 43 caracteres.");
+    }
     const u = new URL(`${maranataKeyBaseUrl(options.keyUrl)}/api/sso/start`);
     u.searchParams.set("app", appId);
     u.searchParams.set("return", returnUrl);
@@ -93,6 +105,10 @@ export function maranataKeyStartUrl(appId, returnUrl, options = {}) {
         u.searchParams.set("mode", options.mode);
     if (options.force)
         u.searchParams.set("force", "1");
+    if (pkceStartValido(options)) {
+        u.searchParams.set("code_challenge", options.codeChallenge);
+        u.searchParams.set("code_challenge_method", options.codeChallengeMethod);
+    }
     return u.toString();
 }
 /** URL de logout do SSO, voltando para `returnUrl`. */
@@ -110,10 +126,17 @@ export function maranataKeyLogoutUrl(appId, returnUrl, options = {}) {
  * tinham, e o certo aqui: quem chama trata `null` como "não autenticado", e
  * um erro de rede não deve virar 500 na cara do usuário.
  */
-export async function verifyMaranataKeyToken(token, options = {}) {
-    const { keyUrl, timeoutMs = 5000, fetchImpl } = options;
+export async function verifyMaranataKeyToken(token, ...args) {
+    const options = (args[0] ?? {});
+    const { keyUrl, app, codeVerifier, timeoutMs = 5000, fetchImpl } = options;
     const doFetch = fetchImpl ?? globalThis.fetch;
     if (typeof doFetch !== "function")
+        return null;
+    // O IBM nunca possui o fallback legado: sem verifier válido, nem toca o Key.
+    // Para outros apps, um verifier informado também precisa ser RFC 7636 válido.
+    if (app === "ibm" && !codeVerifier)
+        return null;
+    if (codeVerifier !== undefined && !PKCE_CODE_VERIFIER.test(codeVerifier))
         return null;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -121,7 +144,11 @@ export async function verifyMaranataKeyToken(token, options = {}) {
         const r = await doFetch(`${maranataKeyBaseUrl(keyUrl)}/api/auth/verify`, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ token }),
+            body: JSON.stringify({
+                token,
+                ...(app ? { app } : {}),
+                ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
+            }),
             cache: "no-store",
             signal: controller.signal,
         });
