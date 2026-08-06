@@ -80,6 +80,14 @@ ar, lento, ou a integration key não estiver configurada neste app ainda, o
 switcher continua funcionando com a lista estática do catálogo (mesmo
 comportamento das cópias hardcoded de hoje, mas com URLs corretas).
 
+Apps sensíveis ou que aceitam pessoas externas, como o IBM, não devem anunciar
+o catálogo inteiro em uma falha do Key. Use o fallback fechado:
+
+```ts
+const apps = membership ?? catalogAsApps("ibm", { mode: "current-only" });
+// somente IBM, papel ACESSO (piso zero)
+```
+
 ### 2. `./catalog` — snapshot estático + resolução de URL canônica
 
 ```ts
@@ -101,7 +109,7 @@ const apps = await fetchMembershipApps({
   email: "pastor@maranata.app",
   integrationKey: process.env.MARANATA_INTEGRATION_KEY!,
   source: "rodizio", // aparece como x-source no maranata-key
-  // keyUrl?: default = process.env.MARANATA_KEY_AUTH_URL ?? "https://auth.maranata.app"
+  // keyUrl?: default = process.env.MARANATA_KEY_AUTH_URL ?? "https://key.maranata.app"
   // timeoutMs?: default 3000
 });
 // null em qualquer falha (rede, timeout, 4xx/5xx, JSON inesperado) — nunca lança.
@@ -118,9 +126,38 @@ apps consumidores em `MARANATA_KEY_AUTH_URL`.
 import { catalogAsApps } from "@paulo-brito-jr/maranata-suite-kit/fallback";
 
 const apps = catalogAsApps("rodizio"); // papel "USUARIO", via "direct", URL canônica
+const ibm = catalogAsApps("ibm", { mode: "current-only" }); // somente IBM, papel "ACESSO"
+const nenhum = catalogAsApps("ibm", { mode: "none" }); // []
 ```
 
-### 5. `./app-switcher` — componente React apresentacional
+`ACESSO` confirma apenas a entrada no app e não concede ações sobre recursos.
+Ownership, matrícula, turma e janela continuam sob autorização do domínio.
+
+### 5. `./sso` — introspecção vinculada ao app e PKCE do IBM
+
+```ts
+const loginUrl = maranataKeyStartUrl("ibm", callbackUrl, {
+  codeChallenge,
+  codeChallengeMethod: "S256",
+});
+
+const user = await verifyMaranataKeyToken(ticket, {
+  app: "ibm",
+  codeVerifier,
+});
+```
+
+Passar `app` faz o Key revalidar a concessão atual e o app-alvo do ticket. Um
+consumidor não deve aceitar apenas a assinatura do ticket.
+
+Para o IBM, o contrato é estrito: `maranataKeyStartUrl()` exige o challenge
+SHA-256 em base64url (sem padding) e envia `code_challenge_method=S256`;
+`verifyMaranataKeyToken()` exige o verifier correspondente e o envia somente
+no corpo `POST` como `code_verifier`, nunca na URL. O app deve manter o verifier
+efêmero no servidor ou em cookie `HttpOnly`, vinculado ao `state`, e descartá-lo
+no primeiro uso. Chamadas legadas dos demais apps continuam válidas sem PKCE.
+
+### 6. `./app-switcher` — componente React apresentacional
 
 ```tsx
 import { AppSwitcher } from "@paulo-brito-jr/maranata-suite-kit/app-switcher";

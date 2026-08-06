@@ -1,6 +1,6 @@
 import type { MembershipApp } from "./membership.js";
 export type AppSwitcherProps = {
-    /** Apps do membro — de `fetchMembershipApps` (`./membership`) ou `catalogAsApps` (`./fallback`). */
+    /** Apps da conta — de `fetchMembershipApps` (`./membership`) ou `catalogAsApps` (`./fallback`). */
     apps: MembershipApp[];
     /** Slug do app atual: ganha checkmark e não abre em nova aba. */
     currentSlug?: string | null;
@@ -20,5 +20,5 @@ export type AppSwitcherProps = {
  * lib de ícones tipo lucide) com fallback pra inicial do nome quando o slug
  * não está (ainda) no catálogo sincronizado.
  */
-export declare function AppSwitcher({ apps, currentSlug, className }: AppSwitcherProps): import("react/jsx-runtime").JSX.Element | null;
+export declare function AppSwitcher({ apps, currentSlug, className }: AppSwitcherProps): import("react").JSX.Element | null;
 //# sourceMappingURL=app-switcher.d.ts.map

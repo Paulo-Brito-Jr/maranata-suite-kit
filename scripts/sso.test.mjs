@@ -108,7 +108,15 @@ test("logoutUrl: mesmo par app/return, path de logout", () => {
 // verify — fail-soft (o contrato que as 7 cópias já tinham)
 // ---------------------------------------------------------------------------
 
-const okUser = { sub: "u1", email: "a@b.c", name: "Fulano" };
+const okUser = {
+  sub: "u1",
+  email: "a@b.c",
+  name: "Fulano",
+  authzVersion: 7,
+};
+
+const RFC7636_CODE_CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
+const RFC7636_CODE_VERIFIER = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
 
 function fetchFake(resposta) {
   return async () => resposta;
@@ -187,4 +195,110 @@ test("verify: POST no /api/auth/verify do host resolvido, com o token no corpo",
   assert.equal(visto.init.method, "POST");
   assert.equal(visto.init.cache, "no-store");
   assert.deepEqual(JSON.parse(visto.init.body), { token: "token-abc" });
+});
+
+test("verify: app consumidor é enviado para revogação vinculada", async () => {
+  let body = null;
+  const user = await verifyMaranataKeyToken("ticket-ibm", {
+    app: "ibm",
+    codeVerifier: RFC7636_CODE_VERIFIER,
+    fetchImpl: async (_url, init) => {
+      body = JSON.parse(init.body);
+      return {
+        ok: true,
+        json: async () => ({
+          valid: true,
+          user: { ...okUser, identityKind: "EXTERNAL", targetApp: "ibm" },
+        }),
+      };
+    },
+  });
+
+  assert.deepEqual(body, {
+    token: "ticket-ibm",
+    app: "ibm",
+    code_verifier: RFC7636_CODE_VERIFIER,
+  });
+  assert.equal(user.identityKind, "EXTERNAL");
+  assert.equal(user.targetApp, "ibm");
+  assert.equal(user.authzVersion, 7);
+});
+
+// ---------------------------------------------------------------------------
+// IBM — ticket de uso único vinculado a PKCE S256
+// ---------------------------------------------------------------------------
+
+test("startUrl IBM: envia challenge e método S256", () => {
+  const u = new URL(
+    maranataKeyStartUrl("ibm", "https://ibm.maranata.app/api/sso/finish", {
+      codeChallenge: RFC7636_CODE_CHALLENGE,
+      codeChallengeMethod: "S256",
+    }),
+  );
+
+  assert.equal(u.searchParams.get("app"), "ibm");
+  assert.equal(u.searchParams.get("code_challenge"), RFC7636_CODE_CHALLENGE);
+  assert.equal(u.searchParams.get("code_challenge_method"), "S256");
+});
+
+test("startUrl IBM: rejeita ausência ou forma inválida de PKCE", () => {
+  assert.throws(
+    () => maranataKeyStartUrl("ibm", "https://ibm.maranata.app/api/sso/finish"),
+    /PKCE S256/i,
+  );
+  assert.throws(
+    () =>
+      maranataKeyStartUrl("ibm", "https://ibm.maranata.app/api/sso/finish", {
+        codeChallenge: "curto",
+        codeChallengeMethod: "S256",
+      }),
+    /PKCE S256/i,
+  );
+});
+
+test("verify IBM: serializa codeVerifier como code_verifier no corpo", async () => {
+  let body = null;
+  const user = await verifyMaranataKeyToken("ticket-ibm-pkce", {
+    app: "ibm",
+    codeVerifier: RFC7636_CODE_VERIFIER,
+    fetchImpl: async (_url, init) => {
+      body = JSON.parse(init.body);
+      return {
+        ok: true,
+        json: async () => ({
+          valid: true,
+          user: { ...okUser, identityKind: "EXTERNAL", targetApp: "ibm" },
+        }),
+      };
+    },
+  });
+
+  assert.deepEqual(body, {
+    token: "ticket-ibm-pkce",
+    app: "ibm",
+    code_verifier: RFC7636_CODE_VERIFIER,
+  });
+  assert.equal(user?.identityKind, "EXTERNAL");
+});
+
+test("verify IBM: sem verifier válido falha fechado antes do fetch", async () => {
+  let fetches = 0;
+  const fetchImpl = async () => {
+    fetches += 1;
+    return { ok: true, json: async () => ({ valid: true, user: okUser }) };
+  };
+
+  assert.equal(
+    await verifyMaranataKeyToken("ticket-sem-verifier", { app: "ibm", fetchImpl }),
+    null,
+  );
+  assert.equal(
+    await verifyMaranataKeyToken("ticket-verifier-curto", {
+      app: "ibm",
+      codeVerifier: "curto",
+      fetchImpl,
+    }),
+    null,
+  );
+  assert.equal(fetches, 0);
 });

@@ -5,7 +5,7 @@ import { canonicalAppUrl } from "./catalog.js";
  * Espelha `EffectiveApp` de
  * /Users/paulobrito/dev/maranata-key/src/lib/membership.ts
  */
-export type Papel = "ADMIN" | "ADMIN_SEM_EXCLUIR" | "USUARIO" | "VIEWER";
+export type Papel = "ADMIN" | "ADMIN_SEM_EXCLUIR" | "USUARIO" | "VIEWER" | "ACESSO";
 
 export type MembershipApp = {
   slug: string;
@@ -17,11 +17,11 @@ export type MembershipApp = {
 };
 
 export type FetchMembershipAppsOptions = {
-  /** E-mail do membro (mesma chave usada como identidade no maranata-key). */
+  /** E-mail da conta (chave de consulta legada do maranata-key; não é FK de domínio). */
   email: string;
   /**
    * Base URL do maranata-key. Default: `process.env.MARANATA_KEY_AUTH_URL`,
-   * caindo pra "https://auth.maranata.app". A env antiga `MARANATA_KEY_URL`
+   * caindo pra "https://key.maranata.app". A env antiga `MARANATA_KEY_URL`
    * (usada em cópias hardcoded anteriores) foi descontinuada por design —
    * padronizamos em `MARANATA_KEY_AUTH_URL` e ela NÃO tem efeito aqui.
    */
@@ -34,7 +34,7 @@ export type FetchMembershipAppsOptions = {
   timeoutMs?: number;
 };
 
-const DEFAULT_KEY_URL = "https://auth.maranata.app";
+const DEFAULT_KEY_URL = "https://key.maranata.app";
 
 /**
  * Lê `process.env[name]` sem depender de `@types/node` (este pacote não
@@ -49,7 +49,13 @@ function readEnv(name: string): string | undefined {
   return proc?.env?.[name];
 }
 
-const PAPEIS_VALIDOS: readonly Papel[] = ["ADMIN", "ADMIN_SEM_EXCLUIR", "USUARIO", "VIEWER"];
+const PAPEIS_VALIDOS: readonly Papel[] = [
+  "ADMIN",
+  "ADMIN_SEM_EXCLUIR",
+  "USUARIO",
+  "VIEWER",
+  "ACESSO",
+];
 
 const VIAS_VALIDAS = new Set(["direct", "group", "role", "federated"]);
 
@@ -66,7 +72,7 @@ type RawMembershipApp = {
 };
 
 /**
- * Busca os apps efetivos de um membro no maranata-key (fonte de identidade
+ * Busca os apps efetivos de uma conta no maranata-key (fonte de identidade
  * da Suite Maranata — GET /api/membership/{email}).
  *
  * Server-to-server: `Authorization: Bearer <integrationKey>` + `x-source`,

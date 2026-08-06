@@ -3,7 +3,7 @@
  * Espelha `EffectiveApp` de
  * /Users/paulobrito/dev/maranata-key/src/lib/membership.ts
  */
-export type Papel = "ADMIN" | "ADMIN_SEM_EXCLUIR" | "USUARIO" | "VIEWER";
+export type Papel = "ADMIN" | "ADMIN_SEM_EXCLUIR" | "USUARIO" | "VIEWER" | "ACESSO";
 export type MembershipApp = {
     slug: string;
     nome: string;
@@ -13,11 +13,11 @@ export type MembershipApp = {
     via: "direct" | "group" | "role" | "federated";
 };
 export type FetchMembershipAppsOptions = {
-    /** E-mail do membro (mesma chave usada como identidade no maranata-key). */
+    /** E-mail da conta (chave de consulta legada do maranata-key; não é FK de domínio). */
     email: string;
     /**
      * Base URL do maranata-key. Default: `process.env.MARANATA_KEY_AUTH_URL`,
-     * caindo pra "https://auth.maranata.app". A env antiga `MARANATA_KEY_URL`
+     * caindo pra "https://key.maranata.app". A env antiga `MARANATA_KEY_URL`
      * (usada em cópias hardcoded anteriores) foi descontinuada por design —
      * padronizamos em `MARANATA_KEY_AUTH_URL` e ela NÃO tem efeito aqui.
      */
@@ -30,7 +30,7 @@ export type FetchMembershipAppsOptions = {
     timeoutMs?: number;
 };
 /**
- * Busca os apps efetivos de um membro no maranata-key (fonte de identidade
+ * Busca os apps efetivos de uma conta no maranata-key (fonte de identidade
  * da Suite Maranata — GET /api/membership/{email}).
  *
  * Server-to-server: `Authorization: Bearer <integrationKey>` + `x-source`,
