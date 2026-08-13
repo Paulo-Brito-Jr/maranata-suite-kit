@@ -80,7 +80,7 @@ export const MARANATA_SUITE_CATALOG: Record<string, SuiteCatalogEntry> = {
     nome: "Financeiro Maranata",
     url: "https://financeiro.maranata.app",
     icon: "💰",
-    cor: "#10b981",
+    cor: "#163970",
   },
   "maranata-app": {
     slug: "maranata-app",
