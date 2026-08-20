@@ -105,6 +105,27 @@ export const MARANATA_SUITE_CATALOG = {
         icon: "📖",
         cor: "#163970",
     },
+    ensino: {
+        slug: "ensino",
+        nome: "Ensino Maranata",
+        url: "https://ensino.maranata.app",
+        icon: "🎓",
+        cor: "#163970",
+    },
+    ibm: {
+        slug: "ibm",
+        nome: "Instituto Bíblico Maranata",
+        url: "https://ibm.maranata.app",
+        icon: "📚",
+        cor: "#163970",
+    },
+    ebd: {
+        slug: "ebd",
+        nome: "EBD Maranata",
+        url: "https://ebd.maranata.app",
+        icon: "✝️",
+        cor: "#163970",
+    },
     // O Key não tem entrada no MARANATA_SUITE_APPS (é o emissor do SSO, não um
     // consumidor) — entra aqui direto pro observatório/switcher enxergarem o
     // app mais crítico da suite.

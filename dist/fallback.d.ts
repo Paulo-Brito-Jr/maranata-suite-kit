@@ -13,5 +13,14 @@ import type { MembershipApp } from "./membership.js";
  * como nas cópias hardcoded existentes). Reservado pra uma futura
  * personalização por app (ex: esconder o próprio app da lista).
  */
-export declare function catalogAsApps(currentSlug?: string | null): MembershipApp[];
+export type CatalogFallbackMode = "catalog" | "current-only" | "none";
+export type CatalogAsAppsOptions = {
+    /**
+     * `catalog` preserva o comportamento legado. Apps sensíveis ou abertos a
+     * identidade externa devem usar `current-only` ou `none` para não anunciar
+     * acesso que o Key não confirmou.
+     */
+    mode?: CatalogFallbackMode;
+};
+export declare function catalogAsApps(currentSlug?: string | null, options?: CatalogAsAppsOptions): MembershipApp[];
 //# sourceMappingURL=fallback.d.ts.map

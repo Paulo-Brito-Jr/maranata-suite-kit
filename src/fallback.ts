@@ -15,16 +15,32 @@ import type { MembershipApp } from "./membership.js";
  * como nas cópias hardcoded existentes). Reservado pra uma futura
  * personalização por app (ex: esconder o próprio app da lista).
  */
-export function catalogAsApps(currentSlug?: string | null): MembershipApp[] {
-  void currentSlug;
+export type CatalogFallbackMode = "catalog" | "current-only" | "none";
+
+export type CatalogAsAppsOptions = {
+  /**
+   * `catalog` preserva o comportamento legado. Apps sensíveis ou abertos a
+   * identidade externa devem usar `current-only` ou `none` para não anunciar
+   * acesso que o Key não confirmou.
+   */
+  mode?: CatalogFallbackMode;
+};
+
+export function catalogAsApps(
+  currentSlug?: string | null,
+  options: CatalogAsAppsOptions = {},
+): MembershipApp[] {
+  const mode = options.mode ?? "catalog";
+  if (mode === "none") return [];
 
   return Object.values(MARANATA_SUITE_CATALOG)
+    .filter((entry) => mode === "catalog" || entry.slug === currentSlug)
     .map(
       (entry): MembershipApp => ({
         slug: entry.slug,
         nome: entry.nome,
         url: entry.url,
-        papel: "USUARIO",
+        papel: mode === "current-only" ? "ACESSO" : "USUARIO",
         via: "direct",
       }),
     )
