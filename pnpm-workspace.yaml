@@ -1,0 +1,6 @@
+# Declara aqui o mesmo auto-install-peers=false que o repo ja fixa no arquivo de
+# config do npm, para valer tambem onde esse arquivo nao e honrado: o job do
+# Dependabot regenerou o lock com `autoInstallPeers: true` e o
+# `pnpm install --frozen-lockfile` do CI quebrou com
+# ERR_PNPM_LOCKFILE_CONFIG_MISMATCH (PR #24).
+autoInstallPeers: false
