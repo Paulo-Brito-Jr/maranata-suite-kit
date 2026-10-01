@@ -5,6 +5,9 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    # Cooldown de 7 dias (regra da casa): versao com menos de 7 dias de publicada nao vira PR (so version updates).
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 3
     labels: ["dependencies"]
     # Prisma 7 e uma migracao estrutural (schema.prisma -> prisma.config.ts),
@@ -25,6 +28,9 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    # Cooldown de 7 dias (regra da casa): versao com menos de 7 dias de publicada nao vira PR (so version updates).
+    cooldown:
+      default-days: 7
     groups:
       github-actions:
         patterns: ["*"]

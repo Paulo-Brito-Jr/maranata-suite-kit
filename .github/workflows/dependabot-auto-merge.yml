@@ -10,6 +10,7 @@ permissions:
 jobs:
   dependabot-auto-merge:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.actor == 'dependabot[bot]'
     steps:
       - name: Fetch Dependabot metadata
@@ -18,10 +19,138 @@ jobs:
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: Enable auto-merge for patch/minor updates
+      # Regra da casa: nenhuma dependencia entra com menos de 7 dias de publicada.
+      # Falha fechada: so o "ok=true" do fim deste passo libera o auto-merge; data
+      # nao encontrada, erro de rede, metadado ausente ou ecossistema desconhecido
+      # = NAO arma (o motivo vai para o log e para o resumo do job).
+      # O fetch-metadata v2.5.0 so preenche newVersion na dependencia 0 de PR de
+      # 1 pacote (em PR de grupo vem vazio); por isso as versoes saem do YAML
+      # "dependency-version" do primeiro commit, o mesmo que ele verifica.
+      - name: Check 7-day cooldown of updated dependencies
+        id: cooldown
         if: |
           steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
           steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
+          DEPS_JSON: ${{ steps.metadata.outputs.updated-dependencies-json }}
+          COOLDOWN_DAYS: "7"
+        run: |
+          set -euo pipefail
+          case "$COOLDOWN_DAYS" in ''|*[!0-9]*) echo "COOLDOWN_DAYS invalido: $COOLDOWN_DAYS"; exit 1 ;; esac
+          min_s=$((COOLDOWN_DAYS * 86400))
+          motivos=""
+          resumo=""
+          problema() { motivos="${motivos}$1"$'\n'; }
+
+          tentar() {
+            local i
+            for i in 1 2 3; do
+              "$@" 2>/dev/null && return 0
+              sleep 2
+            done
+            return 1
+          }
+
+          # imprime a data ISO de publicacao de $1@$2 (ou nada, se nao achar)
+          publicado_em() {
+            local nome="$1" ver="$2" repo tag raw
+            case "$ECOSYSTEM" in
+              npm_and_yarn)
+                printf '%s' "$nome" | grep -Eq '^(@[A-Za-z0-9][A-Za-z0-9._~-]*/)?[A-Za-z0-9][A-Za-z0-9._~-]*$' || return 0
+                printf '%s' "$ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.+-]+)?$' || return 0
+                tentar npm view "$nome" time --json | jq -r --arg v "$ver" '.[$v] // empty'
+                ;;
+              github_actions)
+                repo=$(printf '%s' "$nome" | cut -d/ -f1-2)
+                printf '%s' "$repo" | grep -Eq '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$' || return 0
+                printf '%s' "$ver" | grep -Eq '^v?[0-9]+(\.[0-9]+){0,2}([-+][0-9A-Za-z.+-]+)?$' || return 0
+                for tag in "v${ver#v}" "${ver#v}"; do
+                  if raw=$(tentar gh api "repos/$repo/releases/tags/$tag"); then
+                    printf '%s' "$raw" | jq -r '.published_at // empty'
+                    return 0
+                  fi
+                done
+                ;;
+            esac
+          }
+
+          echo "Cooldown minimo: $COOLDOWN_DAYS dias | ecossistema: $ECOSYSTEM | PR #$PR_NUMBER"
+          case "$ECOSYSTEM" in
+            npm_and_yarn|github_actions) ;;
+            *) problema "ecossistema '$ECOSYSTEM' sem conferencia de data implementada" ;;
+          esac
+
+          nomes=$(printf '%s' "$DEPS_JSON" | jq -r 'if type == "array" then .[].dependencyName // empty else empty end' 2>/dev/null || true)
+          [ -n "$nomes" ] || problema "updated-dependencies-json vazio ou invalido"
+
+          raw=$(gh api "repos/$REPO/pulls/$PR_NUMBER/commits?per_page=1" 2>/dev/null) || raw=""
+          msg=$(printf '%s' "$raw" | jq -r '.[0].commit.message // empty' 2>/dev/null || true)
+          [ -n "$msg" ] || problema "nao consegui ler o commit do Dependabot (versoes desconhecidas)"
+          versoes=$(printf '%s\n' "$msg" | awk '
+            /^---$/ { bloco = 1; next }
+            /^\.\.\.$/ { bloco = 0; next }
+            bloco && /^- dependency-name:/ { n = $0; sub(/^- dependency-name:[ ]*/, "", n); next }
+            bloco && /^  dependency-version:/ { v = $0; sub(/^  dependency-version:[ ]*/, "", v); print n "\t" v }
+          ' | tr -d "\"'\r")
+
+          while IFS= read -r nome; do
+            [ -n "$nome" ] || continue
+            vs=$(printf '%s\n' "$versoes" | awk -F'\t' -v n="$nome" '$1 == n { print $2 }')
+            if [ -z "$vs" ]; then
+              problema "$nome: sem dependency-version no commit do Dependabot"
+              continue
+            fi
+            while IFS= read -r ver; do
+              pub=$(publicado_em "$nome" "$ver" || true)
+              if [ -z "$pub" ]; then
+                problema "$nome@$ver: data de publicacao NAO encontrada"
+                resumo="${resumo}| $nome | $ver | ? | ? | sem data (nao arma) |"$'\n'
+                continue
+              fi
+              seg=$(jq -n --arg d "$pub" 'now - ($d | sub("\\.[0-9]+"; "") | fromdateiso8601) | floor' 2>/dev/null || true)
+              case "$seg" in
+                ''|*[!0-9]*) problema "$nome@$ver: data de publicacao ilegivel ($pub)"; resumo="${resumo}| $nome | $ver | $pub | ? | ilegivel (nao arma) |"$'\n'; continue ;;
+              esac
+              dias=$(awk -v s="$seg" 'BEGIN { printf "%.1f", s / 86400 }')
+              if [ "$seg" -ge "$min_s" ]; then
+                estado="ok"
+              else
+                estado="MUITO NOVA (nao arma)"
+                problema "$nome@$ver: publicada ha $dias dias (< $COOLDOWN_DAYS)"
+              fi
+              echo "$nome@$ver publicada em $pub ($dias dias): $estado"
+              resumo="${resumo}| $nome | $ver | $pub | $dias | $estado |"$'\n'
+            done <<< "$vs"
+          done <<< "$nomes"
+
+          {
+            echo "### Cooldown de $COOLDOWN_DAYS dias das dependencias"
+            echo
+            echo "| Pacote | Versao | Publicada em | Idade (dias) | Estado |"
+            echo "| --- | --- | --- | --- | --- |"
+            printf '%s' "$resumo"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -n "$motivos" ]; then
+            while IFS= read -r m; do
+              if [ -n "$m" ]; then echo "::warning title=Auto-merge NAO armado::$m"; fi
+            done <<< "$motivos"
+            { echo; echo "**Auto-merge NAO armado:**"; printf '%s' "$motivos" | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
+            echo "Auto-merge NAO armado: cooldown de $COOLDOWN_DAYS dias nao confirmado para todas as dependencias."
+            exit 0
+          fi
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+          echo "Todas as dependencias tem $COOLDOWN_DAYS dias ou mais: pode armar o auto-merge."
+
+      - name: Enable auto-merge for patch/minor updates
+        if: |
+          steps.cooldown.outputs.ok == 'true' &&
+          (steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor')
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
