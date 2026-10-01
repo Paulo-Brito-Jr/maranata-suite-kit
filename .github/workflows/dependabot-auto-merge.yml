@@ -10,7 +10,7 @@ permissions:
 jobs:
   dependabot-auto-merge:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     if: github.actor == 'dependabot[bot]'
     steps:
       - name: Fetch Dependabot metadata
@@ -19,14 +19,17 @@ jobs:
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      # Regra da casa: nenhuma dependencia entra com menos de 7 dias de publicada.
-      # Falha fechada: so o "ok=true" do fim deste passo libera o auto-merge; data
-      # nao encontrada, erro de rede, metadado ausente ou ecossistema desconhecido
-      # = NAO arma (o motivo vai para o log e para o resumo do job).
-      # O fetch-metadata v2.5.0 so preenche newVersion na dependencia 0 de PR de
-      # 1 pacote (em PR de grupo vem vazio); por isso as versoes saem do YAML
-      # "dependency-version" do primeiro commit, o mesmo que ele verifica.
-      - name: Check 7-day cooldown of updated dependencies
+      # Regra da casa: nenhuma versao entra com menos de 7 dias de publicada.
+      # A fonte da verdade e o CONTEUDO do PR, nao os metadados: a mensagem do
+      # commit do Dependabot pode estar defasada em relacao aos arquivos
+      # (ex.: acampamento-maranata#36 listava lucide-react 1.47.0 e o package.json
+      # tinha 1.48.0) e o fetch-metadata v2.5.0 so preenche newVersion em PR de 1
+      # pacote. Por isso: npm = todo name@versao NOVO no pnpm-lock.yaml (diretos e
+      # transitivos) frente a base; github-actions = as linhas "uses:" adicionadas.
+      # Falha fechada: so o "ok=true" do fim arma o auto-merge; data nao encontrada,
+      # erro de rede, lock fora do padrao, ref flutuante ou ecossistema desconhecido
+      # = NAO arma (motivo no log e no resumo do job).
+      - name: Check 7-day cooldown of new dependency versions
         id: cooldown
         if: |
           steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
@@ -35,104 +38,187 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
-          DEPS_JSON: ${{ steps.metadata.outputs.updated-dependencies-json }}
+          DIRECTORY: ${{ steps.metadata.outputs.directory }}
           COOLDOWN_DAYS: "7"
         run: |
           set -euo pipefail
+          export LC_ALL=C
           case "$COOLDOWN_DAYS" in ''|*[!0-9]*) echo "COOLDOWN_DAYS invalido: $COOLDOWN_DAYS"; exit 1 ;; esac
           min_s=$((COOLDOWN_DAYS * 86400))
+          tmp=$(mktemp -d)
           motivos=""
-          resumo=""
+          linhas=""
+          total=0
+          ok=0
           problema() { motivos="${motivos}$1"$'\n'; }
 
+          # roda o comando ate 3x e imprime so a saida da tentativa que funcionou
           tentar() {
-            local i
+            local i out
             for i in 1 2 3; do
-              "$@" 2>/dev/null && return 0
+              if out=$("$@" 2>/dev/null); then
+                printf '%s\n' "$out"
+                return 0
+              fi
               sleep 2
             done
             return 1
           }
 
-          # imprime a data ISO de publicacao de $1@$2 (ou nada, se nao achar)
-          publicado_em() {
-            local nome="$1" ver="$2" repo tag raw
-            case "$ECOSYSTEM" in
-              npm_and_yarn)
-                printf '%s' "$nome" | grep -Eq '^(@[A-Za-z0-9][A-Za-z0-9._~-]*/)?[A-Za-z0-9][A-Za-z0-9._~-]*$' || return 0
-                printf '%s' "$ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.+-]+)?$' || return 0
-                tentar npm view "$nome" time --json | jq -r --arg v "$ver" '.[$v] // empty'
-                ;;
-              github_actions)
-                repo=$(printf '%s' "$nome" | cut -d/ -f1-2)
-                printf '%s' "$repo" | grep -Eq '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$' || return 0
-                printf '%s' "$ver" | grep -Eq '^v?[0-9]+(\.[0-9]+){0,2}([-+][0-9A-Za-z.+-]+)?$' || return 0
-                for tag in "v${ver#v}" "${ver#v}"; do
-                  if raw=$(tentar gh api "repos/$repo/releases/tags/$tag"); then
-                    printf '%s' "$raw" | jq -r '.published_at // empty'
-                    return 0
-                  fi
-                done
+          # $1 = rotulo (nome@versao), $2 = data ISO de publicacao (vazia = nao encontrada)
+          confere() {
+            local seg dias
+            total=$((total + 1))
+            if [ -z "$2" ]; then
+              problema "$1: data de publicacao NAO encontrada"
+              linhas="${linhas}| $1 | ? | sem data (nao arma) |"$'\n'
+              return 0
+            fi
+            seg=$(jq -n --arg d "$2" 'now - ($d | sub("\\.[0-9]+"; "") | fromdateiso8601) | floor' 2>/dev/null || true)
+            case "$seg" in
+              ''|*[!0-9]*)
+                problema "$1: data de publicacao ilegivel ($2)"
+                linhas="${linhas}| $1 | $2 | ilegivel (nao arma) |"$'\n'
+                return 0
                 ;;
             esac
+            dias=$(awk -v s="$seg" 'BEGIN { printf "%.1f", s / 86400 }')
+            if [ "$seg" -ge "$min_s" ]; then
+              ok=$((ok + 1))
+            else
+              problema "$1: publicada ha $dias dias (< $COOLDOWN_DAYS)"
+              linhas="${linhas}| $1 | $2 | $dias dias: MUITO NOVA (nao arma) |"$'\n'
+            fi
+            echo "$1 publicada em $2 ($dias dias)"
           }
 
-          echo "Cooldown minimo: $COOLDOWN_DAYS dias | ecossistema: $ECOSYSTEM | PR #$PR_NUMBER"
-          case "$ECOSYSTEM" in
-            npm_and_yarn|github_actions) ;;
-            *) problema "ecossistema '$ECOSYSTEM' sem conferencia de data implementada" ;;
-          esac
-
-          nomes=$(printf '%s' "$DEPS_JSON" | jq -r 'if type == "array" then .[].dependencyName // empty else empty end' 2>/dev/null || true)
-          [ -n "$nomes" ] || problema "updated-dependencies-json vazio ou invalido"
-
-          raw=$(gh api "repos/$REPO/pulls/$PR_NUMBER/commits?per_page=1" 2>/dev/null) || raw=""
-          msg=$(printf '%s' "$raw" | jq -r '.[0].commit.message // empty' 2>/dev/null || true)
-          [ -n "$msg" ] || problema "nao consegui ler o commit do Dependabot (versoes desconhecidas)"
-          versoes=$(printf '%s\n' "$msg" | awk '
-            /^---$/ { bloco = 1; next }
-            /^\.\.\.$/ { bloco = 0; next }
-            bloco && /^- dependency-name:/ { n = $0; sub(/^- dependency-name:[ ]*/, "", n); next }
-            bloco && /^  dependency-version:/ { v = $0; sub(/^  dependency-version:[ ]*/, "", v); print n "\t" v }
-          ' | tr -d "\"'\r")
-
-          while IFS= read -r nome; do
-            [ -n "$nome" ] || continue
-            vs=$(printf '%s\n' "$versoes" | awk -F'\t' -v n="$nome" '$1 == n { print $2 }')
-            if [ -z "$vs" ]; then
-              problema "$nome: sem dependency-version no commit do Dependabot"
-              continue
+          # npm: data de publicacao de $1@$2 (cache do packument por nome)
+          data_npm() {
+            local f="$tmp/npm-$(printf '%s' "$1" | tr '/@' '__').json"
+            if [ ! -s "$f" ]; then
+              tentar npm view "$1" time --json > "$f" || { rm -f "$f"; return 0; }
             fi
-            while IFS= read -r ver; do
-              pub=$(publicado_em "$nome" "$ver" || true)
-              if [ -z "$pub" ]; then
-                problema "$nome@$ver: data de publicacao NAO encontrada"
-                resumo="${resumo}| $nome | $ver | ? | ? | sem data (nao arma) |"$'\n'
-                continue
-              fi
-              seg=$(jq -n --arg d "$pub" 'now - ($d | sub("\\.[0-9]+"; "") | fromdateiso8601) | floor' 2>/dev/null || true)
-              case "$seg" in
-                ''|*[!0-9]*) problema "$nome@$ver: data de publicacao ilegivel ($pub)"; resumo="${resumo}| $nome | $ver | $pub | ? | ilegivel (nao arma) |"$'\n'; continue ;;
-              esac
-              dias=$(awk -v s="$seg" 'BEGIN { printf "%.1f", s / 86400 }')
-              if [ "$seg" -ge "$min_s" ]; then
-                estado="ok"
-              else
-                estado="MUITO NOVA (nao arma)"
-                problema "$nome@$ver: publicada ha $dias dias (< $COOLDOWN_DAYS)"
-              fi
-              echo "$nome@$ver publicada em $pub ($dias dias): $estado"
-              resumo="${resumo}| $nome | $ver | $pub | $dias | $estado |"$'\n'
-            done <<< "$vs"
-          done <<< "$nomes"
+            jq -r --arg v "$2" '.[$v] // empty' "$f" 2>/dev/null || true
+          }
+
+          # pnpm-lock.yaml v9 no stdin -> name@versao de cada entrada da secao packages:
+          chaves_pnpm() {
+            awk '
+              /^packages:/ { p = 1; next }
+              /^[A-Za-z]/ { p = 0 }
+              p && /^  [^ ]/ { k = $0; sub(/^  /, "", k); sub(/:$/, "", k); print k }
+            ' | tr -d "'" | sort -u
+          }
+          lock_em() { gh api "repos/$REPO/contents/pnpm-lock.yaml?ref=$1" -H 'Accept: application/vnd.github.raw'; }
+
+          echo "Cooldown minimo: $COOLDOWN_DAYS dias | ecossistema: $ECOSYSTEM | diretorio: $DIRECTORY | PR #$PR_NUMBER"
+          if [ "$DIRECTORY" != "/" ]; then
+            problema "diretorio '$DIRECTORY' nao suportado (so a raiz)"
+          fi
+          arquivos=$(gh api "repos/$REPO/pulls/$PR_NUMBER/files" --paginate --jq '.[].filename' 2>/dev/null) || arquivos=""
+          if [ -z "$arquivos" ]; then
+            problema "nao consegui listar os arquivos do PR"
+          fi
+
+          if [ -z "$motivos" ]; then
+            case "$ECOSYSTEM" in
+              npm_and_yarn)
+                if ! grep -qxF "pnpm-lock.yaml" <<< "$arquivos"; then
+                  problema "o PR nao altera o pnpm-lock.yaml (unico lock suportado): versoes resolvidas nao comprovadas"
+                elif ! tentar lock_em "$HEAD_SHA" > "$tmp/head.lock" || ! tentar lock_em "$BASE_SHA" > "$tmp/base.lock"; then
+                  problema "nao consegui ler o pnpm-lock.yaml do PR ou da base"
+                elif ! grep -Eq "^lockfileVersion: '?9\.0'?$" "$tmp/head.lock"; then
+                  problema "pnpm-lock.yaml com lockfileVersion diferente de 9.0 (formato nao suportado)"
+                else
+                  chaves_pnpm < "$tmp/head.lock" > "$tmp/head.keys"
+                  chaves_pnpm < "$tmp/base.lock" > "$tmp/base.keys"
+                  comm -23 "$tmp/head.keys" "$tmp/base.keys" > "$tmp/novas.keys"
+                  n_head=$(wc -l < "$tmp/head.keys" | tr -d ' ')
+                  n_base=$(wc -l < "$tmp/base.keys" | tr -d ' ')
+                  n_novas=$(wc -l < "$tmp/novas.keys" | tr -d ' ')
+                  echo "pnpm-lock: $n_head pacotes no PR, $n_base na base, $n_novas novos a conferir"
+                  if [ "$n_head" -lt 1 ] || [ "$n_base" -lt 1 ]; then
+                    problema "pnpm-lock.yaml ilegivel (secao packages vazia)"
+                  elif [ "$n_novas" -gt 400 ]; then
+                    problema "$n_novas pacotes novos no lock (> 400): conferencia manual"
+                  else
+                    while IFS= read -r k; do
+                      if [ -z "$k" ]; then continue; fi
+                      nome="${k%@*}"
+                      ver="${k##*@}"
+                      if grep -Eq '^(@[A-Za-z0-9][A-Za-z0-9._~-]*/)?[A-Za-z0-9][A-Za-z0-9._~-]*$' <<< "$nome" &&
+                         grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.+-]+)?$' <<< "$ver"; then
+                        confere "$nome@$ver" "$(data_npm "$nome" "$ver")"
+                      else
+                        total=$((total + 1))
+                        problema "$k: entrada do lock fora do padrao do registry npm (nao confirmavel)"
+                        linhas="${linhas}| $k | ? | fora do padrao (nao arma) |"$'\n'
+                      fi
+                    done < "$tmp/novas.keys"
+                  fi
+                fi
+                ;;
+              github_actions)
+                gh api "repos/$REPO/pulls/$PR_NUMBER/files" --paginate --jq '.[] | select(.filename | test("^[.]github/(workflows|actions)/.+[.]ya?ml$")) | (.patch // "")' 2>/dev/null > "$tmp/acoes.patch" || : > "$tmp/acoes.patch"
+                awk '
+                  /^\+[ ]*(- )?uses:/ {
+                    l = $0
+                    sub(/^\+[ ]*(- )?uses:[ ]*/, "", l)
+                    ref = l; sub(/[ ]*#.*/, "", ref)
+                    com = ""
+                    if (index(l, "#") > 0) { com = l; sub(/^[^#]*#[ ]*/, "", com); sub(/[ ].*$/, "", com) }
+                    i = index(ref, "@")
+                    if (i > 0) print substr(ref, 1, i - 1) "\t" substr(ref, i + 1) "\t" com
+                    else print ref "\t\t" com
+                  }
+                ' "$tmp/acoes.patch" | tr -d "\"'\r" > "$tmp/acoes.txt"
+                if [ ! -s "$tmp/acoes.txt" ]; then
+                  problema "nenhuma referencia 'uses:' adicionada encontrada no PR"
+                fi
+                while IFS=$'\t' read -r nome ref com; do
+                  if [ -z "$nome" ]; then continue; fi
+                  repo=$(cut -d/ -f1-2 <<< "$nome")
+                  tag=""
+                  if grep -Eq '^v?[0-9]+\.[0-9]+(\.[0-9]+)?([-+][0-9A-Za-z.+-]+)?$' <<< "$ref"; then
+                    tag="$ref"
+                  elif grep -Eq '^[0-9a-f]{40}$' <<< "$ref" && grep -Eq '^v?[0-9]+\.[0-9]+(\.[0-9]+)?([-+][0-9A-Za-z.+-]+)?$' <<< "$com"; then
+                    tag="$com"
+                  fi
+                  if [ -z "$tag" ] || ! grep -Eq '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$' <<< "$repo"; then
+                    total=$((total + 1))
+                    problema "$nome@$ref: ref flutuante, sem versao legivel ou fora do padrao (sem data de publicacao confiavel)"
+                    linhas="${linhas}| $nome@$ref | ? | sem versao exata (nao arma) |"$'\n'
+                    continue
+                  fi
+                  pub=""
+                  for t in "$tag" "v${tag#v}" "${tag#v}"; do
+                    if raw=$(tentar gh api "repos/$repo/releases/tags/$t"); then
+                      pub=$(jq -r '.published_at // empty' <<< "$raw" 2>/dev/null || true)
+                      if [ -n "$pub" ]; then break; fi
+                    fi
+                  done
+                  confere "$nome@$tag" "$pub"
+                done < "$tmp/acoes.txt"
+                ;;
+              *)
+                problema "ecossistema '$ECOSYSTEM' sem conferencia de data implementada"
+                ;;
+            esac
+          fi
 
           {
-            echo "### Cooldown de $COOLDOWN_DAYS dias das dependencias"
+            echo "### Cooldown de $COOLDOWN_DAYS dias das versoes novas"
             echo
-            echo "| Pacote | Versao | Publicada em | Idade (dias) | Estado |"
-            echo "| --- | --- | --- | --- | --- |"
-            printf '%s' "$resumo"
+            echo "$ok de $total versoes conferidas tem $COOLDOWN_DAYS dias ou mais."
+            if [ -n "$linhas" ]; then
+              echo
+              echo "| Pacote | Publicada em | Estado |"
+              echo "| --- | --- | --- |"
+              printf '%s' "$linhas"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ -n "$motivos" ]; then
@@ -140,11 +226,11 @@ jobs:
               if [ -n "$m" ]; then echo "::warning title=Auto-merge NAO armado::$m"; fi
             done <<< "$motivos"
             { echo; echo "**Auto-merge NAO armado:**"; printf '%s' "$motivos" | sed 's/^/- /'; } >> "$GITHUB_STEP_SUMMARY"
-            echo "Auto-merge NAO armado: cooldown de $COOLDOWN_DAYS dias nao confirmado para todas as dependencias."
+            echo "Auto-merge NAO armado: cooldown de $COOLDOWN_DAYS dias nao confirmado ($ok de $total versoes ok)."
             exit 0
           fi
           echo "ok=true" >> "$GITHUB_OUTPUT"
-          echo "Todas as dependencias tem $COOLDOWN_DAYS dias ou mais: pode armar o auto-merge."
+          echo "Todas as $total versoes novas tem $COOLDOWN_DAYS dias ou mais: pode armar o auto-merge."
 
       - name: Enable auto-merge for patch/minor updates
         if: |
