@@ -302,3 +302,25 @@ test("verify IBM: sem verifier válido falha fechado antes do fetch", async () =
   );
   assert.equal(fetches, 0);
 });
+
+// ---------------------------------------------------------------------------
+// Export `default` (W8 pendência 3): sem a condição `default`, consumidor CJS /
+// tsx / bundler sem a condição `import` falhava com ERR_PACKAGE_PATH_NOT_EXPORTED.
+// ---------------------------------------------------------------------------
+
+test("package.json: ./sso tem as condições import E default apontando para o mesmo arquivo", async () => {
+  const { readFileSync } = await import("node:fs");
+  const pkg = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  );
+  const sso = pkg.exports["./sso"];
+  assert.equal(sso.import, "./dist/sso.js");
+  assert.equal(sso.default, "./dist/sso.js");
+});
+
+test("./sso resolve por require() (condição default, sem a condição import)", async () => {
+  const { createRequire } = await import("node:module");
+  const require = createRequire(import.meta.url);
+  const resolvido = require.resolve("@paulo-brito-jr/maranata-suite-kit/sso");
+  assert.match(resolvido, /dist[\\/]sso\.js$/);
+});
