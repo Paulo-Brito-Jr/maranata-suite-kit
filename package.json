@@ -41,7 +41,8 @@
     },
     "./sso": {
       "types": "./dist/sso.d.ts",
-      "import": "./dist/sso.js"
+      "import": "./dist/sso.js",
+      "default": "./dist/sso.js"
     },
     "./pastoral": {
       "types": "./dist/pastoral.d.ts",
