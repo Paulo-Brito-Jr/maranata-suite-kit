@@ -66,6 +66,8 @@ jobs:
         run: node --test scripts/permissions.test.mjs
       - name: SSO (host canônico, montagem de URL, verify fail-soft)
         run: node --test scripts/sso.test.mjs
+      - name: AppSwitcher (contrato visual e a11y, React stub)
+        run: node --test scripts/app-switcher.test.mjs
       - name: Tutorial package self-reference
         run: >-
           node --input-type=module -e "const mod = await

@@ -7,18 +7,22 @@ export type AppSwitcherProps = {
     className?: string;
 };
 /**
- * Dropdown do app switcher da Suite Maranata.
+ * Dropdown do app switcher da Suite Maranata (idioma Apple).
  *
  * Puramente apresentacional — zero fetch interno, zero dependência do host
- * além de `react` (peer). Segue o padrão "button cru + Tailwind" (variante
- * mais completa hoje em rodizio-maranata/components/layout/app-switcher.tsx:
- * CURRENT + checkmark), sem importar `@/components/ui/*` de nenhum host —
- * assim funciona igual nos ~10 apps da Suite, cada um com config de shadcn
- * própria (ou nenhuma).
+ * além de `react` (peer). Sem `@/components/ui/*` e sem lib de ícones: o
+ * ícone do botão é um SVG inline (grade 2x2) e o de cada app vem do catálogo
+ * local por slug (`./catalog`, emoji/char) com fallback pra inicial do nome.
  *
- * Ícone/cor vêm do catálogo local por slug (`./catalog`, emoji/char — nunca
- * lib de ícones tipo lucide) com fallback pra inicial do nome quando o slug
- * não está (ainda) no catálogo sincronizado.
+ * Só usa classes semânticas que TODOS os apps da Suite definem (background,
+ * foreground, muted, muted-foreground, popover, popover-foreground, border,
+ * accent, ring) — nada de tokens que só existem nos apps Apple.
+ *
+ * Contrato de estrutura (consumidores dependem): o `<button>` é filho direto
+ * da raiz, p.ex. `className="[&>button]:pointer-coarse:min-h-11"`.
+ *
+ * Teclado: Enter/Espaço/seta abrem; setas, Home e End percorrem os itens;
+ * Esc fecha e devolve o foco ao botão; Tab fecha.
  */
 export declare function AppSwitcher({ apps, currentSlug, className }: AppSwitcherProps): import("react").JSX.Element | null;
 //# sourceMappingURL=app-switcher.d.ts.map

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
 
 import { MARANATA_SUITE_CATALOG } from "./catalog.js";
 import type { MembershipApp } from "./membership.js";
@@ -21,31 +22,46 @@ function initial(nome: string): string {
   return nome.trim().charAt(0).toUpperCase() || "?";
 }
 
+/** "COORDENADOR" -> "Coordenador" (caixa de frase, sem uppercase por CSS). */
+function sentenceCase(texto: string): string {
+  const t = texto.trim().toLowerCase();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 /**
- * Dropdown do app switcher da Suite Maranata.
+ * Dropdown do app switcher da Suite Maranata (idioma Apple).
  *
  * Puramente apresentacional — zero fetch interno, zero dependência do host
- * além de `react` (peer). Segue o padrão "button cru + Tailwind" (variante
- * mais completa hoje em rodizio-maranata/components/layout/app-switcher.tsx:
- * CURRENT + checkmark), sem importar `@/components/ui/*` de nenhum host —
- * assim funciona igual nos ~10 apps da Suite, cada um com config de shadcn
- * própria (ou nenhuma).
+ * além de `react` (peer). Sem `@/components/ui/*` e sem lib de ícones: o
+ * ícone do botão é um SVG inline (grade 2x2) e o de cada app vem do catálogo
+ * local por slug (`./catalog`, emoji/char) com fallback pra inicial do nome.
  *
- * Ícone/cor vêm do catálogo local por slug (`./catalog`, emoji/char — nunca
- * lib de ícones tipo lucide) com fallback pra inicial do nome quando o slug
- * não está (ainda) no catálogo sincronizado.
+ * Só usa classes semânticas que TODOS os apps da Suite definem (background,
+ * foreground, muted, muted-foreground, popover, popover-foreground, border,
+ * accent, ring) — nada de tokens que só existem nos apps Apple.
+ *
+ * Contrato de estrutura (consumidores dependem): o `<button>` é filho direto
+ * da raiz, p.ex. `className="[&>button]:pointer-coarse:min-h-11"`.
+ *
+ * Teclado: Enter/Espaço/seta abrem; setas, Home e End percorrem os itens;
+ * Esc fecha e devolve o foco ao botão; Tab fecha.
  */
 export function AppSwitcher({ apps, currentSlug, className }: AppSwitcherProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  // Quando o menu abre pelo teclado, o foco entra no primeiro/último item.
+  const focusOnOpen = useRef<"first" | "last" | null>(null);
 
   useEffect(() => {
     if (!open) return;
     function onClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+    function onKey(e: globalThis.KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      buttonRef.current?.focus();
     }
     document.addEventListener("mousedown", onClick);
     document.addEventListener("keydown", onKey);
@@ -55,30 +71,89 @@ export function AppSwitcher({ apps, currentSlug, className }: AppSwitcherProps) 
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open || !focusOnOpen.current) return;
+    const itens = ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
+    if (itens && itens.length > 0) {
+      (focusOnOpen.current === "last" ? itens[itens.length - 1] : itens[0])?.focus();
+    }
+    focusOnOpen.current = null;
+  }, [open]);
+
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Tab") {
+      if (open) setOpen(false);
+      return;
+    }
+    const isArrow = e.key === "ArrowDown" || e.key === "ArrowUp";
+    if (!open) {
+      if (isArrow && e.target === buttonRef.current) {
+        e.preventDefault();
+        focusOnOpen.current = e.key === "ArrowUp" ? "last" : "first";
+        setOpen(true);
+      }
+      return;
+    }
+    if (!isArrow && e.key !== "Home" && e.key !== "End") return;
+    const itens = Array.from(
+      ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    );
+    if (itens.length === 0) return;
+    e.preventDefault();
+    const atual = itens.indexOf(document.activeElement as HTMLElement);
+    let proximo: number;
+    if (e.key === "Home") proximo = 0;
+    else if (e.key === "End") proximo = itens.length - 1;
+    else if (e.key === "ArrowDown") proximo = atual < 0 ? 0 : (atual + 1) % itens.length;
+    else proximo = atual <= 0 ? itens.length - 1 : atual - 1;
+    itens[proximo]?.focus();
+  }
+
   if (apps.length === 0) return null;
 
   return (
-    <div ref={ref} className={cx("relative", className)}>
+    <div ref={ref} className={cx("relative", className)} onKeyDown={onKeyDown}>
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          // Clique/toque não move o foco pro menu; só o teclado (setas) faz isso.
+          focusOnOpen.current = null;
+          setOpen((v) => !v);
+        }}
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-label="Apps, trocar de app"
         title="Trocar de app"
-        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className={cx(
+          "inline-flex h-8 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors",
+          "hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          open ? "bg-muted text-foreground" : "bg-transparent text-muted-foreground",
+        )}
       >
-        <span aria-hidden className="leading-none">
-          🔀
-        </span>
+        <svg
+          aria-hidden
+          focusable="false"
+          viewBox="0 0 16 16"
+          width="16"
+          height="16"
+          className="size-4 shrink-0 fill-current"
+        >
+          <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5" />
+          <rect x="9" y="1.5" width="5.5" height="5.5" rx="1.5" />
+          <rect x="1.5" y="9" width="5.5" height="5.5" rx="1.5" />
+          <rect x="9" y="9" width="5.5" height="5.5" rx="1.5" />
+        </svg>
         <span className="hidden sm:inline">Apps</span>
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-border bg-popover p-2 shadow-lg ring-1 ring-foreground/5"
+          aria-label="Apps da Suite Maranata"
+          className="absolute right-0 z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl bg-popover p-1.5 text-popover-foreground shadow-md ring-1 ring-border"
         >
-          <p className="px-2 pb-1 pt-1 text-[10px] uppercase tracking-widest text-muted-foreground">
+          <p className="px-3 pb-1 pt-2 text-xs font-medium text-muted-foreground">
             Suite Maranata
           </p>
           {apps.map((app) => {
@@ -94,36 +169,35 @@ export function AppSwitcher({ apps, currentSlug, className }: AppSwitcherProps) 
                 target={isCurrent ? undefined : "_blank"}
                 rel={isCurrent ? undefined : "noopener noreferrer"}
                 role="menuitem"
+                aria-current={isCurrent ? "page" : undefined}
                 onClick={() => setOpen(false)}
-                className={cx(
-                  "flex items-center gap-2 rounded-md px-2 py-2 transition-colors",
-                  isCurrent ? "bg-muted" : "hover:bg-muted",
-                )}
+                className="flex min-h-11 items-center gap-3 rounded-xl px-2.5 py-1.5 transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span
                   aria-hidden
-                  className="flex size-6 shrink-0 items-center justify-center rounded-md text-sm"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-lg text-base"
                   style={{ backgroundColor: `${cor}1a`, color: cor }}
                 >
                   {icon}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                    <span className="truncate">{app.nome}</span>
-                    {isCurrent && (
-                      <svg
-                        aria-hidden
-                        viewBox="0 0 16 16"
-                        className="size-3 shrink-0 fill-current"
-                      >
-                        <path d="M13.7 4.3a1 1 0 0 1 0 1.4l-6.5 6.5a1 1 0 0 1-1.4 0L2.3 8.7a1 1 0 1 1 1.4-1.4L6.5 10l5.8-5.8a1 1 0 0 1 1.4 0Z" />
-                      </svg>
-                    )}
+                  <span className="block truncate text-sm font-medium text-foreground">
+                    {app.nome}
                   </span>
-                  <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">
-                    {isCurrent ? "app atual" : app.papel.toLowerCase()}
+                  <span className="block text-xs text-muted-foreground">
+                    {isCurrent ? "App atual" : sentenceCase(app.papel)}
                   </span>
                 </span>
+                {isCurrent && (
+                  <svg
+                    aria-hidden
+                    focusable="false"
+                    viewBox="0 0 16 16"
+                    className="size-4 shrink-0 fill-current text-foreground"
+                  >
+                    <path d="M13.7 4.3a1 1 0 0 1 0 1.4l-6.5 6.5a1 1 0 0 1-1.4 0L2.3 8.7a1 1 0 1 1 1.4-1.4L6.5 10l5.8-5.8a1 1 0 0 1 1.4 0Z" />
+                  </svg>
+                )}
               </a>
             );
           })}

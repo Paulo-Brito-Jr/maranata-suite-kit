@@ -169,13 +169,21 @@ import { AppSwitcher } from "@paulo-brito-jr/maranata-suite-kit/app-switcher";
 - Zero dependência do host além de `react` (peer) — nada de
   `@/components/ui/*` nem lucide. Ícone/cor vêm do catálogo local por slug
   (emoji/char), com fallback pra inicial do nome.
-- Estilo "button cru + Tailwind" (variante mais completa hoje em
-  `rodizio-maranata/components/layout/app-switcher.tsx`): dropdown com
-  checkmark no app atual, fecha em click-fora/Esc.
-- Usa os tokens Tailwind/shadcn já convencionados na Suite
-  (`border-border`, `bg-popover`, `text-muted-foreground`, etc.) — funciona
-  em qualquer um dos ~10 apps, com ou sem shadcn configurado, desde que o
-  tema exponha essas CSS vars (todos já expõem).
+- Idioma Apple (0.16.0): botão em cápsula sem borda dura (`bg-transparent`,
+  `hover:bg-muted`), ícone SVG inline (grade 2x2, 16 px, `aria-hidden`) e
+  rótulo "Apps" visível a partir de `sm`; popover `bg-popover` sólido com
+  hairline (`ring-1 ring-border`), sombra leve, raio 16 e itens de 44 px;
+  checkmark no app atual (`aria-current="page"`).
+- Teclado: Enter/Espaço/setas abrem; setas, Home e End percorrem os itens;
+  Esc fecha e devolve o foco ao botão; Tab fecha; clique fora fecha.
+- Contrato de estrutura: o `<button>` é filho direto da raiz, então o host
+  pode ajustar o alvo de toque com
+  `className="[&>button]:pointer-coarse:min-h-11 [&>button]:pointer-coarse:min-w-11"`.
+- Usa só as classes semânticas que todos os apps da Suite definem
+  (`background`, `foreground`, `muted`, `muted-foreground`, `popover`,
+  `popover-foreground`, `border`, `accent`, `ring`) — nada de tokens que só
+  existem nos apps Apple. O teste `scripts/app-switcher.test.mjs` barra
+  regressão disso.
 
 ## Exports
 
@@ -206,6 +214,7 @@ pnpm typecheck    # tsc --noEmit
 pnpm smoke        # node scripts/smoke.mjs — exercita canonicalAppUrl + catalogAsApps contra dist/
 pnpm test:tutorial-editorial # testa o validador dos manifestos da Fase 1
 pnpm test:tutorial-resolver  # build + testes do resolver fail-closed da Fase 2
+pnpm test:app-switcher       # build + contrato visual/a11y do AppSwitcher (React stub, sem dependência)
 ```
 
 `dist/` é **commitado** (não gitignored) — é assim que os apps consumidores
