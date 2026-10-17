@@ -225,6 +225,133 @@ test("verify: app consumidor é enviado para revogação vinculada", async () =>
 });
 
 // ---------------------------------------------------------------------------
+// verify — fail-closed ESTRITO: só `valid === true` (booleano literal) autentica
+//
+// Regressão (tsk_aef3tPPESG): da 0.14.0 à 0.16.0 a decisão era
+// `j?.valid && j.user`, então QUALQUER `valid` truthy ("yes", 1, "true", {})
+// autenticava, e qualquer `user` truthy (uma string, um array) era devolvido
+// como se fosse um MaranataKeyUser. Parte das cópias locais antigas (tutorial,
+// sistema, igreja) já exigia `valid !== true → null` e validava o `user`; as
+// demais eram truthy e o kit nasceu com essa versão frouxa. Contrato real do
+// Key (maranata-key: src/app/api/auth/verify/route.ts): sucesso =
+// `{ valid: true, user: <objeto> }`; falha = `{ valid: false, error }` com
+// 400/401. Não existem campos irmãos `ok`/`active` — mesmo assim, o teste
+// abaixo trava que eles não valem nada.
+// ---------------------------------------------------------------------------
+
+function verifyComCorpo(corpo, extra = {}) {
+  return verifyMaranataKeyToken("t", {
+    fetchImpl: fetchFake({ ok: true, json: async () => corpo }),
+    ...extra,
+  });
+}
+
+// Truthy que NÃO são o booleano `true`: nenhum pode autenticar.
+const VALID_TRUTHY_NAO_BOOLEANO = [
+  ['string "yes"', "yes"],
+  ["número 1", 1],
+  ['string "true"', "true"],
+  ['string "false" (truthy!)', "false"],
+  ["número -1", -1],
+  ["número Infinity", Infinity],
+  ['string " " (só espaço)', " "],
+  ["objeto vazio {}", {}],
+  ["objeto { valid: true }", { valid: true }],
+  ["array vazio []", []],
+  ["array [true]", [true]],
+];
+
+for (const [rotulo, valid] of VALID_TRUTHY_NAO_BOOLEANO) {
+  test(`verify: valid=${rotulo} NÃO autentica (só o booleano true)`, async () => {
+    assert.equal(await verifyComCorpo({ valid, user: okUser }), null);
+  });
+}
+
+// Falsy: nunca autenticaram; ficam travados para ninguém "inverter" a lógica.
+const VALID_FALSY = [
+  ["false", false],
+  ["0", 0],
+  ["NaN", Number.NaN],
+  ['string ""', ""],
+  ["null", null],
+];
+
+for (const [rotulo, valid] of VALID_FALSY) {
+  test(`verify: valid=${rotulo} devolve null`, async () => {
+    assert.equal(await verifyComCorpo({ valid, user: okUser }), null);
+  });
+}
+
+test("verify: sem o campo `valid` devolve null, mesmo com user presente", async () => {
+  assert.equal(await verifyComCorpo({ user: okUser }), null);
+});
+
+test("verify: campos irmãos (ok/active/success) NÃO substituem `valid === true`", async () => {
+  assert.equal(
+    await verifyComCorpo({ ok: true, active: true, success: true, authenticated: true, user: okUser }),
+    null,
+  );
+  assert.equal(await verifyComCorpo({ valid: false, ok: true, active: true, user: okUser }), null);
+});
+
+test("verify: contrato de falha do Key ({ valid:false, error }) devolve null", async () => {
+  assert.equal(await verifyComCorpo({ valid: false, error: "invalid_token" }), null);
+  // mesmo que, por engano, um user venha junto de um valid:false
+  assert.equal(await verifyComCorpo({ valid: false, error: "app_revoked", user: okUser }), null);
+});
+
+// `user` é o outro campo da decisão: com `valid: true`, só um OBJETO serve.
+const USER_NAO_OBJETO = [
+  ['string "yes"', "yes"],
+  ["número 1", 1],
+  ["booleano true", true],
+  ["array vazio []", []],
+  ["array [user]", [okUser]],
+  ["null", null],
+];
+
+for (const [rotulo, user] of USER_NAO_OBJETO) {
+  test(`verify: valid:true com user=${rotulo} devolve null (user precisa ser objeto)`, async () => {
+    assert.equal(await verifyComCorpo({ valid: true, user }), null);
+  });
+}
+
+// Corpo JSON que nem objeto é (ou que embrulha a resposta num array).
+const CORPO_NAO_OBJETO = [
+  ["null", null],
+  ["true", true],
+  ['string "valid"', "valid"],
+  ["número 1", 1],
+  ["array com a resposta válida dentro", [{ valid: true, user: okUser }]],
+];
+
+for (const [rotulo, corpo] of CORPO_NAO_OBJETO) {
+  test(`verify: corpo ${rotulo} devolve null`, async () => {
+    assert.equal(await verifyComCorpo(corpo), null);
+  });
+}
+
+test("verify: controle positivo — valid:true literal + user objeto devolve o user inteiro", async () => {
+  const completo = {
+    ...okUser,
+    role: "PASTOR",
+    groups: ["pastores-caxias"],
+    apps: { agenda: { papel: "ADMIN", perms: { agenda: ["view", "edit"] } } },
+  };
+  assert.deepEqual(await verifyComCorpo({ valid: true, user: completo }), completo);
+});
+
+test("verify IBM: valid truthy não-booleano também falha fechado (PKCE não afrouxa o contrato)", async () => {
+  for (const valid of ["yes", 1, "true", {}]) {
+    const u = await verifyComCorpo(
+      { valid, user: { ...okUser, identityKind: "EXTERNAL", targetApp: "ibm" } },
+      { app: "ibm", codeVerifier: RFC7636_CODE_VERIFIER },
+    );
+    assert.equal(u, null, `valid=${JSON.stringify(valid)} não pode autenticar no fluxo IBM`);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // IBM — ticket de uso único vinculado a PKCE S256
 // ---------------------------------------------------------------------------
 

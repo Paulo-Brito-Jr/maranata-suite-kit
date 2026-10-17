@@ -157,6 +157,13 @@ no corpo `POST` como `code_verifier`, nunca na URL. O app deve manter o verifier
 efêmero no servidor ou em cookie `HttpOnly`, vinculado ao `state`, e descartá-lo
 no primeiro uso. Chamadas legadas dos demais apps continuam válidas sem PKCE.
 
+Em qualquer app, `verifyMaranataKeyToken()` falha **fechado** no veredito do
+Key: só devolve usuário se a resposta for `2xx` com `valid === true` (o
+booleano literal) e `user` objeto. `valid` truthy que não seja `true`
+(`"yes"`, `1`, `"true"`, `{}`), `user` string/array/`null` ou corpo que nem
+objeto é devolvem `null` — sem coerção truthy no handshake (0.16.1; as
+versões 0.14.0–0.16.0 aceitavam qualquer `valid` truthy).
+
 ### 6. `./app-switcher` — componente React apresentacional
 
 ```tsx
