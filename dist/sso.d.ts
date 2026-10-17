@@ -174,6 +174,12 @@ export type VerifyTokenOptions<AppId extends string | undefined = string | undef
  * malformada ou timeout — nunca lança. É o contrato que as 7 cópias já
  * tinham, e o certo aqui: quem chama trata `null` como "não autenticado", e
  * um erro de rede não deve virar 500 na cara do usuário.
+ *
+ * **Fail-closed no veredito:** só devolve usuário quando o Key responde `2xx`
+ * com `valid === true` (o booleano literal — `"yes"`, `1`, `"true"` e `{}` NÃO
+ * valem) e `user` objeto (não `null`, nem array, nem primitivo). É o contrato
+ * do Key: `{ valid: true, user }` em sucesso, `{ valid: false, error }` em
+ * falha.
  */
 export declare function verifyMaranataKeyToken<const AppId extends string | undefined = undefined>(token: string, ...args: [AppId] extends ["ibm"] ? [options: VerifyTokenOptions<AppId>] : [options?: VerifyTokenOptions<AppId>]): Promise<MaranataKeyUser | null>;
 export {};

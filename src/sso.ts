@@ -244,6 +244,39 @@ export type VerifyTokenOptions<AppId extends string | undefined = string | undef
       ? { app: "ibm"; codeVerifier: string }
       : { codeVerifier?: string });
 
+/** Objeto "de verdade": não é `null`, nem array, nem primitivo. */
+function ehObjeto(valor: unknown): valor is Record<string, unknown> {
+  return typeof valor === "object" && valor !== null && !Array.isArray(valor);
+}
+
+/**
+ * Interpreta o corpo do `POST /api/auth/verify` — a fronteira que transforma a
+ * resposta do Key em "autenticado ou não" (papel, grupos e permissões
+ * continuam sendo decisão do Key; aqui só se lê o veredito). Como é uma
+ * decisão de authz, a regra é fail-closed por construção: **nenhuma coerção
+ * truthy**. Só autentica um corpo objeto com `valid === true` (o booleano
+ * literal) e `user` objeto. Qualquer outra forma — `valid: "yes"`, `1`,
+ * `"true"`, `{}`; `user` string/array/`null`; corpo que nem objeto é — é "não
+ * autenticado" (`null`).
+ *
+ * Contrato real do Key (`maranata-key/src/app/api/auth/verify/route.ts`):
+ * sucesso = `{ valid: true, user }`; falha = `{ valid: false, error }`
+ * (400/401). Não há campos irmãos como `ok`/`active`, e se um dia aparecerem
+ * não substituem `valid === true`.
+ *
+ * As cópias locais que este módulo substituiu eram desiguais nisto: as mais
+ * novas (tutorial, sistema, igreja) já faziam `if (body.valid !== true) return
+ * null`, mas as antigas usavam `j.valid && j.user` e o módulo nasceu (0.14.0)
+ * com essa versão frouxa — corrigida em tsk_aef3tPPESG.
+ */
+function usuarioDoCorpoVerify(corpo: unknown): MaranataKeyUser | null {
+  if (!ehObjeto(corpo)) return null;
+  if (corpo.valid !== true) return null;
+  const { user } = corpo;
+  if (!ehObjeto(user)) return null;
+  return user as MaranataKeyUser;
+}
+
 /**
  * Verifica o token do handshake no Key.
  *
@@ -251,6 +284,12 @@ export type VerifyTokenOptions<AppId extends string | undefined = string | undef
  * malformada ou timeout — nunca lança. É o contrato que as 7 cópias já
  * tinham, e o certo aqui: quem chama trata `null` como "não autenticado", e
  * um erro de rede não deve virar 500 na cara do usuário.
+ *
+ * **Fail-closed no veredito:** só devolve usuário quando o Key responde `2xx`
+ * com `valid === true` (o booleano literal — `"yes"`, `1`, `"true"` e `{}` NÃO
+ * valem) e `user` objeto (não `null`, nem array, nem primitivo). É o contrato
+ * do Key: `{ valid: true, user }` em sucesso, `{ valid: false, error }` em
+ * falha.
  */
 export async function verifyMaranataKeyToken<
   const AppId extends string | undefined = undefined,
@@ -285,8 +324,7 @@ export async function verifyMaranataKeyToken<
       signal: controller.signal,
     });
     if (!r.ok) return null;
-    const j = (await r.json()) as { valid?: boolean; user?: MaranataKeyUser };
-    return j?.valid && j.user ? j.user : null;
+    return usuarioDoCorpoVerify(await r.json());
   } catch {
     return null;
   } finally {
