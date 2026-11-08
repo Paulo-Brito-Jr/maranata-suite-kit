@@ -1,6 +1,10 @@
+# Dependabot só com SECURITY updates (frota Brito/Skynet, 08/11/2026): PR de versão é do Renovate
+# (renovate.json → preset github>Paulo-Brito-Jr/skynet//renovate-presets/frota). open-pull-requests-limit: 0 desliga
+# os version updates do ecossistema e não afeta os security updates. Runbook: skynet/docs/runbooks/fila-de-prs.md
 version: 2
 updates:
   - package-ecosystem: "npm"
+    open-pull-requests-limit: 0
     directory: "/"
     schedule:
       interval: "weekly"
@@ -8,7 +12,6 @@ updates:
     # Cooldown de 7 dias (regra da casa): versao com menos de 7 dias de publicada nao vira PR (so version updates).
     cooldown:
       default-days: 7
-    open-pull-requests-limit: 3
     labels: ["dependencies"]
     # Prisma 7 e uma migracao estrutural (schema.prisma -> prisma.config.ts),
     # nao um bump: fica fora ate o projeto de migracao dedicado.
@@ -25,6 +28,7 @@ updates:
         patterns: ["*"]
         update-types: ["minor", "patch"]
   - package-ecosystem: "github-actions"
+    open-pull-requests-limit: 0
     directory: "/"
     schedule:
       interval: "monthly"

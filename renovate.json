@@ -1,0 +1,4 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["github>Paulo-Brito-Jr/skynet//renovate-presets/frota"]
+}
