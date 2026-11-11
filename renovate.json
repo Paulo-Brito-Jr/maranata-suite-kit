@@ -1,4 +1,5 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": ["Preset compartilhado da frota (skynet/renovate-presets/frota)."],
   "extends": ["github>Paulo-Brito-Jr/skynet//renovate-presets/frota"]
 }
