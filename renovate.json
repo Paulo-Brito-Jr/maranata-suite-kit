@@ -1,5 +1,77 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": ["Preset compartilhado da frota (skynet/renovate-presets/frota)."],
-  "extends": ["github>Paulo-Brito-Jr/skynet//renovate-presets/frota"]
+  "description": [
+    "CÓPIA INLINE do preset da frota (github>Paulo-Brito-Jr/skynet//renovate-presets/frota), copiada em 11/11/2026. Este repo é PÚBLICO e o skynet é privado: o Renovate hospedado da Mend não lê preset de repo privado para repo público (404 no frota.json, issue #33, jobs com result config-validation). Por isso não há 'extends' para o skynet aqui.",
+    "Ao mudar o preset no skynet, repetir a mudança aqui. A menção a renovate-presets/frota acima também faz o scripts/frota-renovate-onboard.sh deixar este arquivo como está.",
+    "Um bot só: o Renovate abre os PRs de versão; o Dependabot do repo fica só com security updates (open-pull-requests-limit: 0).",
+    "Cooldown 7 dias (14 nos majors), versões pinadas, minor+patch de TODAS as dependências num PR por semana (segunda), majors um PR por pacote, GitHub Actions num PR, lock file maintenance mensal, interpretador (.python-version) fora, sem automerge: quem mergeia é a varredura (scripts/skynet-pr-varredura.sh / scripts/frota-prs-varredura.sh) com os checks verdes."
+  ],
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard"
+  ],
+  "timezone": "America/Sao_Paulo",
+  "schedule": [
+    "after 9am and before 6pm on monday"
+  ],
+  "prConcurrentLimit": 5,
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
+  "rangeStrategy": "pin",
+  "automerge": false,
+  "rebaseWhen": "conflicted",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 6am on the first day of the month"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "minor+patch de todas as dependências (prod e dev) num PR só por semana: um preparo de lock, não dez",
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "deps (patch/minor)"
+    },
+    {
+      "description": "majors: um PR por pacote, cooldown 14 d (estatuto supply-chain: 7 d mínimo; major = mais cautela) e aviso de revisão",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "minimumReleaseAge": "14 days",
+      "prBodyNotes": [
+        "MAJOR: pode quebrar tipos ou API. Verify vermelho = corrigir o código no MESMO PR (ou fechar como superado); nunca mergear vermelho."
+      ]
+    },
+    {
+      "description": "GitHub Actions num PR só; não mexem no lock",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github actions"
+    },
+    {
+      "description": "Interpretador não é dependência de app: .python-version (manager pyenv) fica fora. Pin exato do CPython quebrou o python-worker na frota a cada patch (02/09/2026, tsk_vee9LtW8vJ)",
+      "matchManagers": [
+        "pyenv"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Lock file maintenance não tem releaseTimestamp: com o minimumReleaseAge global o check renovate/stability-days ficava pendente para sempre (skynet PR #616). O cooldown do lock é imposto pelo gerador (pnpm minimumReleaseAge / uv exclude-newer)",
+      "matchUpdateTypes": [
+        "lockFileMaintenance"
+      ],
+      "minimumReleaseAge": null
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "description": "CVE confirmada = exceção ao cooldown (estatuto), mas ainda via PR, nunca automerge",
+    "minimumReleaseAge": "0 days",
+    "labels": [
+      "security"
+    ]
+  }
 }
